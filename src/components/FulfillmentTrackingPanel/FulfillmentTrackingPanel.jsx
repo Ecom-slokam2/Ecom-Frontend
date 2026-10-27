@@ -2,6 +2,7 @@ import { Box, Button, Chip, CircularProgress, Typography } from '@mui/material';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import DemoTrackingMap from '../DemoTrackingMap';
+import CustomerLiveDeliveryLocation from '../CustomerLiveDeliveryLocation.jsx';
 import { customerDeliveryStatus } from '../../utils/fulfillmentStatus';
 import { isGlobalOrder } from '../../services/orderApi';
 
@@ -12,9 +13,11 @@ const FulfillmentTrackingPanel = ({ order, fulfillment, shipment, trackingEvents
   const statusTone = ['Delivered', 'Cancelled', 'Failed', 'Returned'].includes(deliveryStatus) ? 'default' : 'success';
   const busy = Boolean(loading.fulfillment || loading.shipment);
   const error = errors.fulfillment || errors.shipment;
+  const shipmentState = String(shipment?.status || '').toUpperCase().replace(/\s+/g, '_');
+  const livePartnerAssigned = ['IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(shipmentState) && Boolean(shipment?.deliveryPartnerId);
 
   return <Box component="section" aria-label="Order tracking status" sx={{ bgcolor: 'white', border: '1px solid #dfe8e3', borderRadius: 2, p: 2.5, display: 'grid', gap: 2 }}>
-    {!isGlobal && <DemoTrackingMap demo={false} store={{ latitude: order?.storeLatitude, longitude: order?.storeLongitude, name: order?.sourceStore || 'Store' }} destination={{ latitude: order?.customerLatitude, longitude: order?.customerLongitude }} />}
+    {!isGlobal && !livePartnerAssigned && <DemoTrackingMap demo={false} store={{ latitude: order?.storeLatitude, longitude: order?.storeLongitude, name: order?.sourceStore || 'Store' }} destination={{ latitude: order?.customerLatitude, longitude: order?.customerLongitude }} />}
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <LocalShippingOutlinedIcon sx={{ color: '#075F40' }} />
@@ -32,6 +35,7 @@ const FulfillmentTrackingPanel = ({ order, fulfillment, shipment, trackingEvents
       {globalPending && <Typography variant="body2" color="text.secondary">Awaiting fulfillment assignment</Typography>}
     </Box>}
     {error && !globalPending && <Typography role="alert" color="error">{error}</Typography>}
+    <CustomerLiveDeliveryLocation order={order} orderId={order?.id} shipment={shipment} />
   </Box>;
 };
 

@@ -61,7 +61,7 @@ const HelpCenterPage = () => {
             </Typography>
           </Box>
           <Box className="support-agent-img-wrap">
-            <span className="agent-emoji">ðŸŽ§ðŸ‘©â€ðŸ’¼</span>
+            <span className="agent-emoji">&#127911;</span>
           </Box>
         </Box>
 

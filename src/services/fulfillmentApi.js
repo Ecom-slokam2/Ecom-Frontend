@@ -51,6 +51,15 @@ export const assignShipmentDeliveryPartner = async (shipmentId, data) =>
     body: JSON.stringify(data),
   });
 
+export const retryCarrierShipment = async (shipmentId, data) =>
+  request(`/api/v1/shipments/${encodeURIComponent(shipmentId)}/carrier-retry`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const getCarrierRetryAttempts = async (shipmentId) =>
+  request(`/api/v1/shipments/${encodeURIComponent(shipmentId)}/carrier-attempts`);
+
 export const markShipmentDelivered = async (shipmentId) =>
   request(`/api/v1/shipments/${encodeURIComponent(shipmentId)}/delivered`, { method: 'PATCH' });
 

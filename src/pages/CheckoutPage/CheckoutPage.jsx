@@ -393,7 +393,7 @@ const CheckoutPage = () => {
       date: firstLine.scheduleDate || '', slot: firstLine.scheduleSlot || '',
       notes: notes.trim(), coupon: appliedCoupon?.name || '', discount, promotionVerified:Boolean(appliedCoupon), subtotal, deliveryFee,
       handlingFee, total, deliveryAddress: requiresDeliveryAddress ? (selectedLocation?.address || deliveryAddress) : '',
-      contactNumber: contactPhone, customerLocation: userCity,
+      contactNumber: contactPhone, customerLocation: String(selectedLocation?.city || userCity || '').trim().slice(0, 150),
       deliveryQuote: deliveryLines.find((line) => line.fulfillmentType !== 'global' && line.quote)?.quote || null,
       customerLatitude: Number.isFinite(customerLat) ? customerLat : null, customerLongitude: Number.isFinite(customerLng) ? customerLng : null,
       storeLatitude: selectedStore?.latitude ?? null, storeLongitude: selectedStore?.longitude ?? null,
@@ -423,14 +423,13 @@ const CheckoutPage = () => {
 
   return <Box className="checkout-page">
     <Box component="header" className="checkout-header">
-      <Box className="checkout-breadcrumb"><button type="button" onClick={() => navigate('/home')}>Home</button><span>â€º</span><button type="button" onClick={() => navigate('/cart')}>Cart</button><span>â€º</span><strong>Checkout</strong></Box>
+      <Box className="checkout-breadcrumb"><button type="button" onClick={() => navigate('/home')}>Home</button><span>›</span><button type="button" onClick={() => navigate('/cart')}>Cart</button><span>›</span><strong>Checkout</strong></Box>
       <Box component="nav" aria-label="Checkout progress" className="checkout-stepper">
         <Box className="checkout-step complete"><span><CheckCircleOutlineOutlinedIcon /></span><b>Cart</b></Box><i />
         <Box className="checkout-step current" aria-current="step"><span>2</span><b>Checkout</b></Box><i />
         <Box className="checkout-step"><span>3</span><b>Payment</b></Box><i />
         <Box className="checkout-step"><span>4</span><b>Confirmation</b></Box>
       </Box>
-      <Button className="checkout-back" onClick={() => navigate('/cart')}>Back to cart</Button>
     </Box>
 
     <Box className="checkout-scroll">
@@ -586,7 +585,7 @@ const CheckoutPage = () => {
                   <span className="checkout-summary-quantity">{item.quantity}</span>
                 </Box>)}
                 <Box className="checkout-summary-store-service"><span>{isConfigured ? storeLine.deliveryLabel || 'Fulfillment' : 'Choose a fulfillment option'}</span><strong>{isConfigured && storeCharge ? formatCurrency(storeCharge) : isConfigured ? 'No charge' : ''}</strong></Box>
-                {scheduledLabel && <small className="checkout-summary-schedule">{isPickupStore ? 'Pickup' : 'Delivery'}: {scheduledLabel}</small>}
+                {scheduledLabel && <small className="checkout-summary-schedule">{isPickupStore ? 'Scheduled pickup' : 'Scheduled delivery'}: {scheduledLabel}</small>}
                 <Box className="checkout-summary-store-subtotal"><span>Store subtotal</span><strong>{formatCurrency(storeSubtotal)}</strong></Box>
               </Box>;
             })}
@@ -594,7 +593,7 @@ const CheckoutPage = () => {
           {appliedCoupon && <Box className="checkout-summary-discount"><LocalOfferOutlinedIcon /><span>Coupon {appliedCoupon.code || appliedCoupon.couponCode || 'applied'}</span><strong>Applied</strong></Box>}
           <Box className="checkout-summary-totals">
             <Box><span>Subtotal ({cartItems.length} items)</span><strong>{formatCurrency(subtotal)}</strong></Box>
-            <Box><span>Delivery Fee</span><strong>{quoteLoading ? 'Calculatingâ€¦' : formatCurrency(deliveryFee)}</strong></Box>
+            <Box><span>Delivery Fee</span><strong>{quoteLoading ? 'Calculating…' : formatCurrency(deliveryFee)}</strong></Box>
             <Box><span>Store Handling Charges</span><strong>{formatCurrency(handlingFee)}</strong></Box>
             <Box><span>Discount</span><strong>-{formatCurrency(discount)}</strong></Box>
             <Box className="checkout-summary-total"><span>Total Amount</span><strong>{formatCurrency(total)}</strong></Box>
@@ -612,7 +611,7 @@ const CheckoutPage = () => {
       <DialogContent className="checkout-address-dialog">
         <Typography>Choose a saved address for this order.</Typography>
         {selectableAddresses.all.map((address) => <Box key={address.id}>
-          <Button fullWidth variant={address.id === selectedAddressId ? 'contained' : 'outlined'} onClick={() => chooseCheckoutAddress(address)}><LocationOnOutlinedIcon /><span><strong>{address.type || (address.fromOrder ? 'Previously used' : 'Saved address')}{address.isDefault ? ' Â· Default' : ''}</strong><small>{address.address}</small></span></Button>
+          <Button fullWidth variant={address.id === selectedAddressId ? 'contained' : 'outlined'} onClick={() => chooseCheckoutAddress(address)}><LocationOnOutlinedIcon /><span><strong>{address.type || (address.fromOrder ? 'Previously used' : 'Saved address')}{address.isDefault ? ' · Default' : ''}</strong><small>{address.address}</small></span></Button>
           {!address.isDefault && address.id && !address.fromOrder && <Button size="small" onClick={() => setDefaultAddress(address.id).catch((reason) => setError(reason.message || 'Could not update your default address.'))}>Set as default address</Button>}
         </Box>)}
         {selectableAddresses.saved.map((address) => <Button key={`edit:${address.id}`} onClick={() => navigate('/address-form', { state: { editAddress: address, returnTo: '/checkout' } })}>Edit {address.type || 'saved address'}</Button>)}

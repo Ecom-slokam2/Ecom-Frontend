@@ -107,13 +107,6 @@ const OrderDetailViewPage = () => {
     return () => { ignore = true; };
   }, [requestedOrderId]);
 
-  useEffect(() => {
-    if (!deliveryCompleted || !order?.id) return;
-    const timer = window.setTimeout(() => {
-      navigate(`/order-details/${encodeURIComponent(order.id)}/review`);
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [deliveryCompleted, navigate, order?.id]);
 
   const dismissReviewPrompt = () => {
     setDismissedReviewOrderId(order.id);
@@ -136,7 +129,7 @@ const OrderDetailViewPage = () => {
     }
   };
 
-  if (loading) return <Box className="order-detail-wrapper"><Header /><Box className="order-detail-header"><IconButton onClick={() => navigate(-1)} style={{ color: '#ffffff' }}><ArrowBackIcon /></IconButton><Typography variant="h6" className="order-detail-title">Order Details</Typography></Box><Box sx={{ p: 3 }}><Typography role="status">Loading order details...</Typography></Box><BottomNav /></Box>;
+  if (loading) return <Box className="order-detail-wrapper"><Header /><Box className="order-detail-header"><IconButton aria-label="Back to orders" onClick={() => navigate('/orders', { replace: true })} style={{ color: '#ffffff' }}><ArrowBackIcon /></IconButton><Typography variant="h6" className="order-detail-title">Order Details</Typography></Box><Box sx={{ p: 3 }}><Typography role="status">Loading order details...</Typography></Box><BottomNav /></Box>;
   if (error && !order) return <Box className="order-detail-wrapper"><Header /><Box className="order-detail-header"><IconButton onClick={() => navigate('/orders')} style={{ color: '#ffffff' }}><ArrowBackIcon /></IconButton><Typography variant="h6" className="order-detail-title">Order Details</Typography></Box><Box sx={{ p: 3 }}><Typography role="alert" color={unavailable ? 'error' : 'text.secondary'}>{error}</Typography><Button sx={{ mt: 2 }} onClick={() => navigate('/orders')}>View Orders</Button></Box><BottomNav /></Box>;
   if (!order) return <Box sx={{ p: 4, textAlign: 'center' }}><Typography variant="h6">No order selected</Typography><Button onClick={() => navigate('/orders')}>View Orders</Button></Box>;
 
@@ -162,7 +155,7 @@ const OrderDetailViewPage = () => {
     <Box className="order-detail-wrapper">
       <Header />
       <Box className="order-detail-header">
-        <IconButton aria-label="Back to previous page" onClick={() => navigate(-1)} style={{ color: '#ffffff' }}><ArrowBackIcon /></IconButton>
+        <IconButton aria-label="Back to orders" onClick={() => navigate('/orders', { replace: true })} style={{ color: '#ffffff' }}><ArrowBackIcon /></IconButton>
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography variant="h6" className="order-detail-title" sx={{ overflowWrap: 'anywhere' }}>Order #{order.orderNumber || order.id}</Typography>
           <Typography variant="caption">{date} | {order.items.length} item{order.items.length === 1 ? '' : 's'} | {formatCurrency(price)}</Typography>

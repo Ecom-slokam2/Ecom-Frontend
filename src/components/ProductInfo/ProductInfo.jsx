@@ -1,5 +1,5 @@
 import { useState, useContext, useEffect, useLayoutEffect, useRef } from 'react';
-import { Box, Typography, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Rating } from '@mui/material';
+import { Box, Typography, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Rating } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ScaleOutlinedIcon from '@mui/icons-material/ScaleOutlined';
@@ -10,7 +10,7 @@ import { AppContext } from '../../context/AppContext';
 import ProductCard from '../../components/ProductCard/ProductCard';
 import { getProduct, getProductVariants, getProductImages } from '../../services/catalogApi';
 import { adaptProduct, adaptImage, adaptVariant, variantChoiceLabel } from '../../services/catalogAdapter';
-import { findInventoryForItem } from '../../services/inventoryApi';
+import { getPublicInventoryAvailability } from '../../services/inventoryApi';
 import { loadProductStock } from '../../utils/productStock.js';
 import { getProductReviews } from '../../services/reviewApi';
 import { resolveProductStore } from '../../services/productStoreResolver';
@@ -120,6 +120,8 @@ const ProductInfo = () => {
   const effectiveVariantId = variantOptions.some((variant) => (variant.variantId || variant.id) === selectedVariantId) ? selectedVariantId : variantOptions[0]?.variantId || variantOptions[0]?.id || '';
   const selectedVariant = variantOptions.find((variant) => (variant.variantId || variant.id) === effectiveVariantId) || variantOptions[0];
   const productPriceKnown = selectedVariant ? selectedVariant.priceKnown !== false : product.priceKnown !== false;
+  const selectedPrice = Number(selectedVariant?.price ?? product.price ?? 0);
+  const productPriceValid = Number.isFinite(selectedPrice) && selectedPrice > 0;
   const variantDataUnknown = actualVariants.length === 0 && !catalogProduct?.catalogVariantsKnown && (!currentVariantResult || currentVariantResult.error);
   const variantsUnavailable = variantDataUnknown || (actualVariants.length > 0 && (!variantOptions.length || variantOptions.every((variant) => !variant.variantId && !variant.id)));
   const selectedWeight = selectedVariant?.label || selectedVariant?.weight || product.weight || '';
@@ -128,14 +130,14 @@ const ProductInfo = () => {
   const stockVariantId = selectedVariant?.variantId ?? selectedVariant?.id ?? null;
   const stockScope = `${product.storeId}:${product.productId}:${stockVariantId}`;
   useEffect(() => {
-    if (!isLoggedIn || !product.storeId || !product.productId) return;
+    if (!product.storeId || !product.productId) return;
     let ignore = false;
-    loadProductStock(findInventoryForItem, { storeId: product.storeId, productId: product.productId, variantId: stockVariantId })
+    loadProductStock(getPublicInventoryAvailability, { storeId: product.storeId, productId: product.productId, variantId: stockVariantId })
       .then(stock => { if (!ignore) setStockResult({ scope: stockScope, ...stock }); });
     return () => { ignore = true; };
-  }, [isLoggedIn, product.storeId, product.productId, stockVariantId, stockScope, stockAttempt]);
+  }, [product.storeId, product.productId, stockVariantId, stockScope, stockAttempt]);
   const stock = stockResult?.scope === stockScope ? stockResult : null;
-  const checkingStock = Boolean(isLoggedIn && product.storeId && catalogProduct && !stock);
+  const checkingStock = Boolean(product.storeId && catalogProduct && !stock);
 
   const bestSellers = catalogProducts.filter((item) => item.productId !== targetId
     && (item.bestSeller === 'Yes' || item.bestSeller === true)
@@ -151,7 +153,6 @@ const ProductInfo = () => {
   ].map((link) => ({ ...link,url:validWebUrl(link.url) })).filter((link) => link.url);
   const productVideos = [product.videoUrl, ...String(product.videoUrls || '').split('\n')].map(validWebUrl).filter((url,index,items) => url && items.indexOf(url) === index);
   const specifications = String(product.specifications || '').split('\n').map((line) => line.trim()).filter(Boolean);
-  const tags = (Array.isArray(product.tags) ? product.tags : String(product.tags || '').split(',')).map((tag) => String(tag).trim()).filter(Boolean);
   const approvedRatings = (Array.isArray(productReviews) ? productReviews : Array.isArray(product.reviews) ? product.reviews : []).filter((review) => String(review.status || '').toUpperCase() === 'APPROVED' && review.active !== false);
   const averageRating = approvedRatings.length
     ? approvedRatings.reduce((sum,review) => sum + Number(review.rating || 0),0) / approvedRatings.length
@@ -161,9 +162,8 @@ const ProductInfo = () => {
 
   const cartItem = cartItems.find((item) => sameCatalogItem(item, { productId: product.productId, variantId: selectedVariant?.variantId || selectedVariant?.id, storeId: product.storeId }));
   const productQuantity = cartItem ? cartItem.quantity : 0;
-  const insufficientStock = stock?.state === 'available' && productQuantity >= stock.available;
-  const stockUnverified = Boolean(isLoggedIn && product.storeId && ['missing', 'error'].includes(stock?.state));
-  const isOutOfStock = stock?.state === 'out' || stockUnverified || product.available === false || product.active === false || selectedVariant?.active === false || variantsUnavailable || insufficientStock;
+  const stockUnverified = Boolean(product.storeId && ['missing', 'error'].includes(stock?.state));
+  const isOutOfStock = stock?.state === 'out' || stockUnverified || product.available === false || product.active === false || selectedVariant?.active === false || variantsUnavailable;
 
   const handleViewCart = () => {
     if (isLoggedIn) {
@@ -174,7 +174,7 @@ const ProductInfo = () => {
   };
 
   const handleAddProduct = () => {
-    if (!catalogProduct || productLoading || cartLoading || checkingStock || isOutOfStock || !productPriceKnown) return;
+    if (!catalogProduct || productLoading || cartLoading || checkingStock || isOutOfStock || !productPriceKnown || !productPriceValid) return;
     addToCart({
       ...product,
       productId: product.productId || product.id,
@@ -241,11 +241,10 @@ const ProductInfo = () => {
           <Typography className="product-description-text">
             {product.description || 'Not specified'}
           </Typography>
-          <Box className={`availability-status ${isOutOfStock ? 'out' : ''}`}><Typography>{productLoading || checkingStock ? 'Checking availability...' : stock?.state === 'available' && insufficientStock ? `Only ${stock.available} available` : stock?.state === 'available' ? `In stock${Number.isInteger(stock.available) ? ` (${stock.available})` : ''}` : stock?.state === 'missing' ? 'Currently unavailable' : stock?.state === 'error' ? 'Availability could not be confirmed. Please try again.' : stock?.state === 'out' || product.active === false || product.available === false || selectedVariant?.active === false ? 'Unavailable' : variantsUnavailable ? 'Variant options unavailable' : !isLoggedIn ? 'Sign in to check stock' : 'Stock availability could not be checked'}</Typography>{stock?.state === 'error' && <Button size="small" onClick={() => setStockAttempt((attempt) => attempt + 1)}>Check again</Button>}</Box>
+          <Box className={`availability-status ${isOutOfStock ? 'out' : ''}`}><Typography>{productLoading || checkingStock ? 'Checking availability...' : stock?.state === 'available' ? 'In stock' : stock?.state === 'missing' ? 'Currently unavailable' : stock?.state === 'error' ? 'Availability could not be confirmed. Please try again.' : stock?.state === 'out' || product.active === false || product.available === false || selectedVariant?.active === false ? 'Unavailable' : variantsUnavailable ? 'Variant options unavailable' : 'Stock availability could not be checked'}</Typography>{stock?.state === 'error' && <Button size="small" onClick={() => setStockAttempt((attempt) => attempt + 1)}>Check again</Button>}</Box>
 
           <Box className="info-block"><Typography className="info-block-heading">Ingredients</Typography><Typography>{product.ingredients || 'Not specified'}</Typography></Box>
           <Box className="info-block"><Typography className="info-block-heading">Specifications</Typography>{specifications.length ? <Box className="specification-list">{specifications.map((specification) => { const [label,...value]=specification.split(':');return <Box key={specification}><Typography>{label}</Typography><Typography>{value.join(':').trim() || '-'}</Typography></Box>; })}</Box> : <Typography>Not specified</Typography>}</Box>
-          <Box className="info-block"><Typography className="info-block-heading">Tags</Typography>{tags.length ? <Box className="tag-list">{tags.map((tag) => <Chip key={tag} label={tag} size="small" />)}</Box> : <Typography>Not specified</Typography>}</Box>
           {(productVideos.length > 0 || externalLinks.length > 0) && <Box className="info-block"><Typography className="info-block-heading">Product Media & Links</Typography><Box className="product-video-grid">{productVideos.map((url) => url.includes('youtu') ? <iframe key={url} title={`${product.title} video`} src={youtubeEmbedUrl(url)} allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowFullScreen /> : <video key={url} controls src={url} />)}</Box><Box className="media-link-list">{externalLinks.map((link) => <Box key={link.label} className="media-link-row"><Typography>{link.label}</Typography><Box><Button size="small" startIcon={<VisibilityOutlinedIcon />} onClick={() => setActiveLink(link)}>Open here</Button><Button size="small" startIcon={<LaunchOutlinedIcon />} onClick={() => window.open(link.url,'_blank','noopener,noreferrer')}>External</Button></Box></Box>)}</Box></Box>}
           <Button variant="outlined" onClick={() => navigate('/reviews')} sx={{ justifyContent:'flex-start',gap:1,textTransform:'none' }}><Rating readOnly size="small" precision={0.1} value={averageRating} /> {averageRating ? `${averageRating.toFixed(1)} · ${Number(product.reviewCount ?? approvedRatings.length)} reviews` : 'No approved reviews yet'}</Button>
           {approvedRatings.length > 0 && <Box className="info-block" aria-label="Approved customer reviews"><Typography className="info-block-heading">Customer reviews</Typography>{approvedRatings.map((review) => <Box key={review.id} sx={{ py:1.5,borderBottom:'1px solid #e2e8f0',display:'grid',gap:0.75 }}><Rating value={Number(review.rating)||0} readOnly size="small" /><Typography sx={{ whiteSpace:'pre-wrap' }}>{review.comment || 'Customer rated this product.'}</Typography>{!!review.photoUrls?.length && <Box sx={{ display:'flex',gap:1,flexWrap:'wrap' }}>{review.photoUrls.map((photo,index)=><Box component="img" key={`${review.id}:${index}`} src={photo} alt={`Customer review photo ${index+1}`} sx={{ width:70,height:70,objectFit:'cover',borderRadius:1 }} />)}</Box>}{review.adminReply && <Box sx={{ pl:1.5,borderLeft:'3px solid #087f5b' }}><Typography variant="caption" fontWeight={700}>Response</Typography><Typography>{review.adminReply}</Typography></Box>}</Box>)}</Box>}
@@ -317,15 +316,15 @@ const ProductInfo = () => {
             <span className="sticky-qty-count">{productQuantity}</span>
             <button
               className="sticky-qty-btn"
-              disabled={cartLoading || productLoading || checkingStock || stockUnverified || isOutOfStock || insufficientStock || !productPriceKnown}
+              disabled={cartLoading || productLoading || checkingStock || stockUnverified || isOutOfStock || !productPriceKnown}
               onClick={handleAddProduct}
             >
               +
             </button>
           </Box>
         ) : (
-          <Button className="bottom-add-btn" disabled={!catalogProduct || productLoading || cartLoading || checkingStock || isOutOfStock || !productPriceKnown} onClick={handleAddProduct}>
-            {productLoading || checkingStock ? 'CHECKING...' : cartLoading ? 'ADDING...' : !productPriceKnown ? 'PRICE UNAVAILABLE' : insufficientStock ? 'STOCK LIMIT' : stockUnverified ? 'CHECK AVAILABILITY' : isOutOfStock ? 'UNAVAILABLE' : 'ADD +'}
+          <Button className="bottom-add-btn" disabled={!catalogProduct || productLoading || cartLoading || checkingStock || stockUnverified || isOutOfStock || !productPriceKnown || !productPriceValid} onClick={handleAddProduct}>
+            {productLoading || checkingStock ? 'CHECKING...' : cartLoading ? 'ADDING...' : !productPriceKnown || !productPriceValid ? 'PRICE UNAVAILABLE' : stockUnverified ? 'CHECK AVAILABILITY' : isOutOfStock ? 'UNAVAILABLE' : 'ADD +'}
           </Button>
         )}
       </Box>

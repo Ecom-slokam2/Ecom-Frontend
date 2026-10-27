@@ -2,16 +2,12 @@
 export const loadProductStock = async (lookup, identity) => {
   try {
     const value = await lookup(identity);
-    const matches = value?.storeId === identity.storeId && value?.productId === identity.productId
-      && (identity.variantId ? value?.variantId === identity.variantId : !value?.variantId);
-    if (!matches || !Number.isInteger(value.availableQuantity) || value.availableQuantity < 0
-      || !['ACTIVE', 'OUT_OF_STOCK', 'INACTIVE'].includes(value.status)) {
+    const matches = String(value?.storeId) === String(identity.storeId) && String(value?.productId) === String(identity.productId)
+      && String(value?.variantId ?? '') === String(identity.variantId ?? '');
+    if (!matches || typeof value?.available !== 'boolean') {
       return { state: 'error' };
     }
-    return {
-      state: value.status === 'ACTIVE' && value.availableQuantity > 0 ? 'available' : 'out',
-      available: value.availableQuantity,
-    };
+    return { state: value.available ? 'available' : 'out' };
   } catch (error) {
     return { state: Number(error.status) === 404 ? 'missing' : 'error' };
   }

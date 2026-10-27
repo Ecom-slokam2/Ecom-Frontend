@@ -13,6 +13,11 @@ export const loadReportOrders = async (fetchBackendOrders, adaptOrder = (order) 
   return [...unique.values()];
 };
 
+export const loadStoreManagerReportOrders = (fetchBackendOrders, storeId, adaptOrder = (order) => order) => {
+  if (!storeId) throw new Error('A verified store assignment is required to load Store Manager reports.');
+  return loadReportOrders(() => fetchBackendOrders({ storeId }), adaptOrder);
+};
+
 const orderDate = (order) => String(order.createdAt || order.created_at || '').slice(0, 10);
 export const orderTotal = (order) => {
   const total = Number(order?.totalAmount ?? order?.total ?? 0);
@@ -28,19 +33,32 @@ export const summarizeOrders = (orders) => ({
   cancelled: orders.filter(isCancelledOrder).length,
   revenue: orders.filter((order) => !isCancelledOrder(order)).reduce((sum, order) => sum + orderTotal(order), 0),
 });
+
+export const reportProductCount = (products, mappings, storeId = null, locationScoped = false) => {
+  if (!locationScoped || !storeId) return products.length;
+  const mappedProductIds = new Set(mappings
+    .filter((mapping) => String(mapping.storeId) === String(storeId) && mapping.available !== false)
+    .map((mapping) => String(mapping.productId)));
+  return products.filter((product) => mappedProductIds.has(String(product.productId || product.id))).length;
+};
+
+export const reportStockUnits = (inventory, storeId = null, locationScoped = false) => inventory
+  .filter((item) => !locationScoped || !storeId || String(item.storeId) === String(storeId))
+  .reduce((sum, item) => sum + Number(item.availableQuantity || 0), 0);
 const orderStores = (order) => [
   order.sourceStore,
   order.store,
   ...(order.fulfilmentAssignments || []).map((assignment) => assignment.store),
 ];
 const orderLocations = (order) => [order.sourceLocation, order.location];
+const matchesFilter = (values, filter) => values.some((value) => String(value || '').trim().toLowerCase() === String(filter || '').trim().toLowerCase());
 
 export const filterReportOrders = (orders, filters) => orders.filter((order) => {
   const date = orderDate(order);
   return (!filters.from || (date && date >= filters.from))
     && (!filters.to || (date && date <= filters.to))
-    && (filters.location === ALL || orderLocations(order).includes(filters.location))
-    && (filters.store === ALL || orderStores(order).includes(filters.store));
+    && (filters.location === ALL || matchesFilter(orderLocations(order), filters.location))
+    && (filters.store === ALL || matchesFilter(orderStores(order), filters.store));
 });
 
 export const calculateStorePerformance = (stores, orders, sort = 'revenue') => stores

@@ -67,7 +67,12 @@ const activeStore = (store = {}) => store.active !== false && store.deliveryEnab
   String(store.availability).toLowerCase() !== 'unavailable' &&
   ![false, 'no', 'false'].includes(typeof store.delivery === 'string' ? store.delivery.toLowerCase() : store.delivery);
 
-export const isGlobalStore = (store = {}) => {
+export const isGlobalStore = (store) => {
+  // Store pages can render once before the store catalog has loaded. The route
+  // intentionally passes `null` until the matching record is found, so treat
+  // that state as a non-global store and let StorePage show its not-found or
+  // loading UI instead of crashing while reading `id`.
+  store = store || {};
   const text = [store.id, store.name, store.type, store.scope, store.fulfillmentType, store.channel, store.deliveryMethod, store.deliveryLabel]
     .filter(Boolean)
     .join(' ')

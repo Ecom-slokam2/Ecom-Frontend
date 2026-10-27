@@ -42,6 +42,8 @@ These are frontend module permissions, not a guarantee that each API action is a
 | Security | Yes | No | No | No |
 | Audit logs | Yes | Yes | No | No |
 
+Store Manager banner and coupon permission is explicitly approved: managers may list/read, create, edit, activate/deactivate, and delete records scoped to their assigned store. The Catalog API derives the store from the authenticated `SCOPE_STORE:<id>` authority, validates that the store exists, rejects conflicting scope/store/location values, and filters list/detail/mutations to that store. Location/global promotion records and other stores are not visible or manageable by Store Managers. These permissions do not enable coupon redemption; checkout continues to reject coupon discounts while server redemption is disabled.
+
 ## Ownership and scope
 
 Super Admin bypasses the shared record-scope filter. Global Admin's shared filter restricts order-like collections containing items to global fulfillment; it does not universally restrict all collections.

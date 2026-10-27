@@ -3,6 +3,7 @@ import { Alert, Box, Button, TextField, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 import { orgAccessService, teamLandingPath } from '../../services/orgAccessService';
+import { STAFF_ROLES } from '../../config/accessControl';
 import logo from '../../assets/images/logo.png';
 import './RoleLoginPage.css';
 
@@ -18,6 +19,9 @@ const RoleLoginPage = () => {
     try {
       const result = await orgAccessService.login(email, password);
       const role = result.user?.role || 'customer';
+      if (!STAFF_ROLES.includes(role)) {
+        throw new Error('This account does not have a team portal role. Sign in through the customer app.');
+      }
       login(result.user, result.token);
 
       navigate(teamLandingPath(role));

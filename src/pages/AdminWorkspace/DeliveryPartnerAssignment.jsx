@@ -3,9 +3,10 @@ import { useContext, useEffect, useState } from 'react';
 import { Alert,Box,Button,Dialog,DialogContent,MenuItem,Select,Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
-import { addTrackingEvent, assignShipmentDeliveryPartner, getShipmentByOrderId, updateShipmentStatus } from '../../services/fulfillmentApi';
+import { addTrackingEvent, assignShipmentDeliveryPartner, getShipmentByOrderId, retryCarrierShipment } from '../../services/fulfillmentApi';
 import { getOrder, getOrderItems, normalizeOrder } from '../../services/orderApi';
 import { prepareShipmentForAssignment } from '../../services/orderServiceWorkflow';
+import { assignDeliveryPartnerForShipment, retryFailedCarrierDelivery } from './deliveryPartnerAssignmentWorkflow';
 
 const FINAL_SHIPMENT_STATUSES = ['DELIVERED', 'CANCELLED', 'RETURNED'];
 const RETRYABLE_SHIPMENT_STATUSES = ['FAILED'];
@@ -28,6 +29,8 @@ const DeliveryPartnerAssignment=({orderId})=>{
   const [partnersLoading,setPartnersLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [success,setSuccess]=useState('');
+  const [retryOutcome,setRetryOutcome]=useState('');
+  const [retryKey,setRetryKey]=useState('');
   useEffect(()=>{let ignore=false;getDeliveryPartners().then(rows=>{if(ignore)return;setPartnerRows(rows);setPartnerError('');}).catch(reason=>{if(!ignore){setPartnerRows([]);setPartnerError(reason.message);}}).finally(()=>{if(!ignore)setPartnersLoading(false);});return()=>{ignore=true;};},[reload]);
   if(loading&&!order)return <Box p={4}>Loading order...</Box>;
   if(!order)return <Box p={4}><Alert severity="error">{error || 'Order not found'}</Alert><Button onClick={()=>navigate('/admin/orders')}>Back to Orders</Button></Box>;
@@ -40,19 +43,37 @@ const DeliveryPartnerAssignment=({orderId})=>{
     setShipment(currentShipment);
     const status=currentShipment.status;
     if(FINAL_SHIPMENT_STATUSES.includes(status))throw new Error(`This shipment is ${status}. Finalized shipments cannot be reassigned.`);
-    if(status==='FAILED'){
-      await updateShipmentStatus(currentShipment.id,'CREATED');
-      await addTrackingEvent(currentShipment.id,{status:'CREATED',location:order.sourceStore||order.store||'Store hub',description:`Delivery retry: reassigned to ${partner.name}.`,eventTime:new Date().toISOString()}).catch(()=>{});
+    if(status==='FAILED'&&user?.role==='location-admin'){
+      let idempotencyKey=retryKey;
+      if(!idempotencyKey){
+        if(!globalThis.crypto?.randomUUID)throw new Error('This browser cannot create a safe retry request ID.');
+        idempotencyKey=globalThis.crypto.randomUUID();
+        setRetryKey(idempotencyKey);
+      }
+      setRetryOutcome('RETRYING');
+      const result=await retryFailedCarrierDelivery({shipment:currentShipment,partner,idempotencyKey,retryCarrierShipment});
+      setRetryOutcome(result.outcome);
+      if(result.outcome==='SUCCEEDED'){
+        const saved=await getShipmentByOrderId(backendId);
+        setShipment(saved);
+        setSuccess(`Carrier accepted the retry for ${partner.name}.`);
+        return;
+      }
+      const message=result.outcome==='UNKNOWN'
+        ? 'Carrier outcome is unknown. Do not retry again until the shipment is reconciled by an operator.'
+        : result.outcome==='EXHAUSTED'
+          ? 'Carrier retry limit reached. Operator review is required.'
+          : ['CARRIER_NOT_CONFIGURED','IDEMPOTENCY_NOT_SUPPORTED'].includes(result.history?.at(-1)?.errorCode)
+            ? 'Carrier retry is not configured in this environment.'
+            : `Carrier retry ended with ${result.outcome}. Review the attempt details before taking further action.`;
+      throw new Error(message);
     }
-    const assignedShipment=await assignShipmentDeliveryPartner(currentShipment.id,{
-      deliveryPartnerId:String(partner.id),
-      deliveryPartnerName:partner.name,
-      deliveryPartnerPhone:partner.phone||partner.mobile||'',
-      vehicleNumber:partner.vehicleNumber||partner.vehicle||'',
+    const assignedShipment=await assignDeliveryPartnerForShipment({
+      shipment:currentShipment,order,partner,assignShipmentDeliveryPartner,addTrackingEvent,
     });
     setShipment(assignedShipment);
     setSuccess(`Order assigned to ${partner.name}.`);
-  }catch(reason){setError(reason.message);}finally{setSaving(false);}};
+  }catch(reason){if(retryOutcome==='RETRYING'&&(!reason.status||Number(reason.status)>=500))setRetryOutcome('UNKNOWN');setError(reason.message);}finally{setSaving(false);}};
   return <Dialog open fullWidth maxWidth="sm" aria-labelledby="delivery-assignment-title" onClose={()=>{if(!saving)navigate('/admin/orders');}}>
     <DialogContent sx={{p:3}}>
       <Button disabled={saving} onClick={()=>navigate('/admin/orders')}>Close</Button>
@@ -72,9 +93,10 @@ const DeliveryPartnerAssignment=({orderId})=>{
       {shipmentLoading && <Typography sx={{mt:2}}>Checking shipment...</Typography>}
       {shipmentError && <Alert severity="error" sx={{mt:2}}>{shipmentError}</Alert>}
       {finalized && <Alert severity="warning" sx={{mt:2}}>Shipment status: {shipment.status}. Partner availability is shown above. This shipment cannot be reassigned.</Alert>}
-      {retryable && <Alert severity="info" sx={{mt:2}}>The previous delivery attempt failed. Select a delivery partner and assign the order to retry delivery.</Alert>}
-      {success ? <><Alert severity="success" sx={{mt:2}}>{success}</Alert><Button variant="contained" sx={{mt:2}} onClick={()=>navigate('/admin/orders',{replace:true})}>View orders</Button></> : <Button variant="contained" sx={{mt:3}} disabled={!partners.some(p=>p.id===partnerId)||saving||partnersLoading||shipmentLoading||finalized||Boolean(shipmentError)||Boolean(partnerError)} onClick={assign}>{saving?(retryable?'Retrying...':'Assigning...'):(retryable?'Retry delivery':'Assign order')}</Button>}
-      {error && <Alert severity="error" sx={{mt:2}}>{error}</Alert>}
+      {retryable && <Alert severity="info" sx={{mt:2}}>{user?.role==='location-admin'?'The previous delivery attempt failed. Select an active partner to submit a safe, idempotent carrier retry.':'The previous delivery attempt failed. Select a delivery partner and assign the order to retry delivery.'}</Alert>}
+      {retryOutcome==='RETRYING' && <Alert severity="info" sx={{mt:2}}>Carrier retry is in progress.</Alert>}
+      {success ? <><Alert severity="success" sx={{mt:2}}>{success}</Alert><Button variant="contained" sx={{mt:2}} onClick={()=>navigate('/admin/orders',{replace:true})}>View orders</Button></> : <Button variant="contained" sx={{mt:3}} disabled={!partners.some(p=>p.id===partnerId)||saving||partnersLoading||shipmentLoading||finalized||Boolean(shipmentError)||Boolean(partnerError)||['UNKNOWN','PERMANENT_FAILURE','EXHAUSTED'].includes(retryOutcome)} onClick={assign}>{saving?(retryable?'Retrying...':'Assigning...'):(retryable?'Retry delivery':'Assign order')}</Button>}
+      {error && <Alert severity={retryOutcome==='UNKNOWN'?'warning':'error'} sx={{mt:2}}>{error}</Alert>}
     </DialogContent>
   </Dialog>;
 };

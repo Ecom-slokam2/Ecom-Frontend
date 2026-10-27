@@ -119,8 +119,8 @@ export const runOrderServiceWorkflow = async (order, action) => {
     let shipment = await getOrCreateShipment(order);
     if (shipment.status === 'CREATED') shipment = await updateShipmentStatus(shipment.id, 'IN_TRANSIT');
     await progressOrderStatus(order, 'SHIPPED');
-    await addTracking(order, shipment, 'IN_TRANSIT', 'Shipment picked up for store delivery.');
-    await notificationFor(order, 'SHIPMENT_CREATED', `Order ${order.orderNumber || order.id} shipped`, 'Your order has shipped with Store Delivery.');
+    await addTracking(order, shipment, 'IN_TRANSIT', order.fulfillmentType === 'global' ? 'Shipment handed to carrier for nationwide delivery.' : 'Shipment picked up for store delivery.');
+    await notificationFor(order, 'SHIPMENT_CREATED', `Order ${order.orderNumber || order.id} shipped`, order.fulfillmentType === 'global' ? 'Your order has shipped from the India-wide Global Store.' : 'Your order has shipped with Store Delivery.');
   }
 
   if (action === 'OUT_FOR_DELIVERY') {

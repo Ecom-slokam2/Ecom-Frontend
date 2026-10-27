@@ -1,72 +1,72 @@
-.quick-location-prompt { position: fixed; top: 8px; left: 8px; z-index: 1600; display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 4px; background: rgba(255, 255, 255, .96); box-shadow: 0 6px 18px rgba(15, 23, 42, .12); }
-.quick-location-button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: #111827; font: inherit; font-size: 10px; font-weight: 700; line-height: 1.2; cursor: pointer; padding: 2px 4px; }
-.quick-location-button:disabled { cursor: wait; color: #667085; }
-.quick-location-button svg { font-size: 14px; color: #0b6e4f; }
-.quick-location-close { width: 18px !important; height: 18px !important; padding: 0 !important; color: #6b7280 !important; }
-.quick-location-close svg { font-size: 14px; }
-.choose-location-dialog .MuiBackdrop-root { background: rgba(16, 34, 26, .48); backdrop-filter: blur(6px); }
-.choose-location-dialog .MuiDialog-paper { border-radius: 24px; margin: 16px; width: calc(100% - 32px); max-height: calc(100% - 32px); }
-.choose-location-dialog-first .MuiBackdrop-root { background: transparent; backdrop-filter: none; }
-.choose-location-dialog-first .MuiDialog-container { align-items: flex-start; justify-content: flex-end; }
-.choose-location-dialog-first .MuiDialog-paper { margin: 12px 14px 0 0; max-width: 318px; width: min(318px, calc(100% - 28px)); border-radius: 0 0 12px 12px; background: #1f2029; color: #f8fafc; box-shadow: 0 16px 36px rgba(15, 23, 42, .26); }
-.choose-location-dialog-first .choose-location-map,
-.choose-location-dialog-first .choose-location-saved,
-.choose-location-dialog-first form,
-.choose-location-dialog-first .MuiDivider-root,
-.choose-location-dialog-first .choose-location-note { display: none; }
-.choose-location-dialog .MuiDialogContent-root { padding: 28px; text-align: center; }
-.choose-location-close { position: absolute !important; top: 10px; right: 10px; z-index: 4; color: #5f6f66 !important; background: rgba(255, 255, 255, .86) !important; }
-.choose-location-close:hover { background: #ffffff !important; }
-.choose-location-dialog-first .MuiDialogContent-root { padding: 18px; text-align: left; }
-.choose-location-dialog-first .choose-location-close { top: 8px; right: 8px; width: 28px; height: 28px; color: #f8fafc !important; background: transparent !important; }
-.choose-location-dialog-first .choose-location-close:hover { background: rgba(255, 255, 255, .12) !important; }
-.choose-location-dialog-first .choose-location-icon { margin: 0 0 12px; padding: 0; background: transparent; color: #f8fafc; }
-.choose-location-dialog-first .choose-location-icon svg { font-size: 20px; }
-.choose-location-dialog-first #choose-location-title { font-size: 15px; color: #f8fafc; line-height: 1.35; margin: 0 22px 14px 0; }
-.choose-location-dialog-first #choose-location-description { font-size: 13px; color: #e5e7eb; margin: 0 0 14px; line-height: 1.4; }
-.choose-location-dialog-first #choose-location-description::before { content: 'Know your location'; display: block; padding-left: 26px; color: #f8fafc; }
-.choose-location-icon { display: inline-flex; padding: 15px; border-radius: 50%; background: #e8f5ee; color: #0b6e4f; margin-bottom: 16px; }
-.choose-location-icon svg { font-size: 34px; }
-#choose-location-title { font-size: 24px; font-weight: 700; color: #17392c; }
-#choose-location-description { font-size: 13px; line-height: 1.7; color: #66746c; margin: 10px 0 16px; }
-.choose-location-map { position: relative; overflow: hidden; border: 1px solid #dce7e1; border-radius: 16px; background: #edf4f0; margin-bottom: 18px; text-align: left; }
-.choose-location-map-viewport { position: relative; height: 220px; overflow: hidden; cursor: grab; touch-action: none; user-select: none; background: #dbe8e1; }
-.choose-location-map-viewport:active { cursor: grabbing; }
-.choose-location-map-viewport img { position: absolute; width: 256px; height: 256px; max-width: none; pointer-events: none; user-select: none; }
-.choose-location-map-marker { position: absolute; left: 50%; top: 50%; z-index: 2; color: #0b6e4f; font-size: 38px !important; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .26)); transform: translate(-50%, -100%); pointer-events: none; }
-.choose-location-map-controls { position: absolute; top: 10px; left: 10px; z-index: 3; display: grid; gap: 6px; }
-.choose-location-map-controls .MuiButton-root { min-width: 34px !important; width: 34px; height: 34px; padding: 0 !important; border-radius: 10px !important; font-size: 20px !important; line-height: 1 !important; }
-.choose-location-map-reset { position: absolute !important; top: 10px; right: 10px; z-index: 3; min-width: 0 !important; padding: 7px 11px !important; border-radius: 999px !important; font-size: 11px !important; }
-.choose-location-map-caption { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-radius: 12px; background: rgba(255, 255, 255, .94); color: #17392c; box-shadow: 0 8px 22px rgba(17, 43, 31, .14); }
-.choose-location-map-caption svg { flex: 0 0 auto; color: #0b6e4f; }
-.choose-location-map-caption p { font-size: 12px; line-height: 1.4; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.choose-location-dialog .MuiButton-root { text-transform: none; border-radius: 10px; padding: 11px; font-weight: 600; }
-.choose-location-dialog .MuiButton-outlined { color: #0b6e4f; border-color: #0b6e4f; }
-.choose-location-dialog-first .MuiButton-outlined { width: 100%; margin-top: 10px; border: 0; border-radius: 999px; background: #3b4f97; color: #fff; }
-.choose-location-dialog-first .MuiButton-outlined:hover { background: #455ba8; border: 0; }
-.choose-location-dialog .MuiButton-contained { background: #0b6e4f; box-shadow: none; }
-.choose-location-dialog .MuiButton-contained:hover { background: #08563d; }
-.choose-location-dialog .MuiButton-root.Mui-disabled { color: #7b8981; background: #e9eeeb; }
-.choose-location-dialog .MuiDivider-root { margin: 18px 0; font-size: 11px; color: #819087; }
-.choose-location-dialog form { display: grid; gap: 14px; text-align: left; }
-.choose-location-dialog h3 { font-size: 13px; font-weight: 600; color: #364b40; }
-.choose-location-dialog .choose-location-note { font-size: 11px; color: #748078; margin-top: 18px; }
-@media (max-width: 480px) {
-  .choose-location-dialog .MuiDialogContent-root { padding: 22px 18px; }
-  #choose-location-title { font-size: 22px; }
-  .choose-location-map-viewport { height: 180px; }
-  .choose-location-map-caption p { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.quick-location-prompt{position:fixed;top:8px;left:8px;z-index:1600;display:inline-flex;align-items:center;gap:4px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:4px;background:rgba(255,255,255,.96);box-shadow:0 6px 18px rgba(15,23,42,.12)}
+.quick-location-button{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:#111827;font:inherit;font-size:10px;font-weight:700;line-height:1.2;cursor:pointer;padding:2px 4px}
+.quick-location-button:disabled{cursor:wait;color:#667085}.quick-location-button svg{font-size:14px;color:#0b6e4f}.quick-location-close{width:18px!important;height:18px!important;padding:0!important;color:#6b7280!important}.quick-location-close svg{font-size:14px}
+.choose-location-dialog .MuiBackdrop-root{background:rgba(16,34,26,.48);backdrop-filter:blur(4px)}
+.choose-location-dialog .MuiDialog-paper{border-radius:18px;margin:16px;width:min(900px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:hidden;box-shadow:0 20px 64px rgba(15,23,42,.24)}
+.choose-location-dialog .MuiDialogContent-root{padding:16px 18px 14px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.choose-location-close{position:absolute!important;top:8px;right:8px;z-index:4;color:#52635c!important}
+.location-modal-heading{display:flex;align-items:center;justify-content:space-between;padding-right:36px;min-height:48px}
+.location-modal-title-group{display:flex;align-items:center;gap:10px;min-width:0}
+.choose-location-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:36px;height:36px;border-radius:50%;background:#e8f5ee;color:#0b6e4f}
+.choose-location-icon svg{font-size:20px}
+#choose-location-title{font-size:18px;font-weight:800;line-height:1.25;color:#152319}
+#choose-location-description{font-size:11px;line-height:1.4;color:#69766f;margin-top:3px}
+.choose-location-layout{display:grid;grid-template-columns:minmax(270px,.92fr) minmax(360px,1.38fr);gap:12px;min-height:0;height:min(330px,48vh)}
+.choose-location-sidebar{display:flex;flex-direction:column;min-width:0;min-height:0;gap:8px}
+.location-mode-tabs{display:flex;align-items:center;border-bottom:1px solid #dfe8e3;min-height:34px}
+.location-mode-tabs .MuiButton-root{min-height:34px;padding:5px 10px;border-radius:0;color:#53645b;font-size:11px;font-weight:700}
+.location-mode-tabs .MuiButton-root svg{font-size:15px;margin-right:5px}
+.location-mode-tabs .MuiButton-root.active{color:#087454;border-bottom:2px solid #087454}
+.saved-address-search .MuiInputBase-root{height:34px;border-radius:7px;font-size:11px;background:#fff}
+.saved-address-search .MuiInputBase-input{padding:7px 0}
+.saved-address-search .MuiOutlinedInput-notchedOutline{border-color:#dce5e0}
+.choose-location-saved-list{display:grid;align-content:start;gap:6px;min-height:0;overflow:auto;padding-right:3px}
+.saved-location-card{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;border:1px solid #dce5e0;border-radius:8px;background:#fff;min-height:52px}
+.saved-location-card.selected{border-color:#07804f;background:#f4fbf7;box-shadow:0 0 0 1px rgba(7,128,79,.08)}
+.saved-location-select.MuiButton-root{display:flex;justify-content:flex-start;align-items:flex-start;gap:8px;min-width:0;padding:8px 6px;text-align:left;color:#23342b}
+.saved-location-radio{flex:0 0 15px;color:#087454;font-size:14px;line-height:1.2}
+.choose-location-saved-text{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.choose-location-saved-text strong{font-size:11px;font-weight:700;color:#25372e}
+.choose-location-saved-text span{display:-webkit-box;overflow:hidden;color:#66746c;font-size:9px;line-height:1.35;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.saved-location-actions{display:flex;align-items:center;padding:3px 4px 0 0}
+.saved-location-actions .MuiButton-root{min-width:0;padding:3px 4px;font-size:9px;line-height:1.2}
+.saved-location-history{margin:8px 8px 0 0;color:#748078}
+.saved-address-empty,.location-signin-note{padding:12px 4px;color:#69766f;font-size:11px}
+.location-add-address.MuiButton-root{min-height:30px;border:1px dashed #16855d;border-radius:6px;padding:4px 8px;font-size:10px;color:#087454}
+.location-add-address .MuiButton-startIcon{margin-right:3px}.location-add-address .MuiSvgIcon-root{font-size:15px}
+.choose-location-map-column{min-width:0;min-height:0;overflow:hidden;border:1px solid #dce5e0;border-radius:9px;background:#edf4f0}
+.choose-location-map-column .google-location-picker{height:100%;gap:0;grid-template-rows:36px minmax(0,1fr)}
+.choose-location-map-column .google-location-search{min-height:0;padding:3px}
+.choose-location-map-column .google-location-input{height:28px;border-radius:5px;padding:0 8px;font-size:10px}
+.choose-location-map-column .google-location-map-wrap{height:100%;min-height:0;border:0;border-radius:0}
+.choose-location-map-column .google-location-current{top:8px!important;right:8px!important;bottom:auto!important;padding:5px 8px!important;font-size:9px!important}
+.choose-location-map-column .google-location-address,.choose-location-map-column .google-location-picker>button{display:none}
+.location-modal-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:9px;border-top:1px solid #e8eeeb}
+.location-selected-summary{display:flex;align-items:center;gap:8px;min-width:0}
+.location-selected-pin{display:flex;align-items:center;justify-content:center;flex:0 0 28px;width:28px;height:28px;border-radius:50%;background:#e8f5ee;color:#087454}
+.location-selected-pin svg{font-size:16px}
+.location-selected-summary>div:last-child{min-width:0}
+.location-selected-label{font-size:9px!important;font-weight:700!important;color:#68766e}
+.location-selected-address{max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px!important;color:#37483e}
+.location-confirm-button.MuiButton-root{flex:0 0 auto;min-height:34px;border-radius:7px;padding:6px 13px;background:#087454;font-size:10px;font-weight:700}
+.location-confirm-button span{margin-left:12px;font-size:16px}
+.location-confirm-button.Mui-disabled{background:#e9eeeb;color:#7b8981}
+@media(max-width:650px){
+ .choose-location-dialog .MuiDialog-paper{margin:10px;width:calc(100% - 20px);max-height:calc(100% - 20px);border-radius:14px}
+ .choose-location-dialog .MuiDialogContent-root{padding:12px;gap:8px}
+ .location-modal-heading{min-height:42px}
+ #choose-location-title{font-size:15px}
+ #choose-location-description{font-size:10px}
+ .choose-location-layout{display:flex;flex-direction:column;height:min(70vh,560px);gap:8px}
+ .choose-location-sidebar{flex:1;min-height:0}
+ .choose-location-map-column{display:none;flex:1;min-height:210px}
+ .choose-location-layout[data-active-pane="map"] .choose-location-sidebar{flex:0 0 auto}
+ .choose-location-layout[data-active-pane="map"] .choose-location-sidebar>:not(.location-mode-tabs){display:none}
+ .choose-location-layout[data-active-pane="map"] .choose-location-map-column{display:block}
+ .choose-location-layout[data-active-pane="saved"] .choose-location-map-column{display:none}
+ .location-modal-footer{align-items:flex-start;flex-direction:column}
+ .location-selected-address{max-width:calc(100vw - 60px)}
+ .location-confirm-button.MuiButton-root{width:100%}
 }
-@media (prefers-reduced-motion: reduce) { .choose-location-dialog * { transition: none !important; } }
-
-.location-search-results { display: grid; gap: 10px; max-height: 240px; overflow-y: auto; }
-.location-search-results .MuiButton-root { text-align: left; justify-content: flex-start; font-size: 12px; }
-
-.choose-location-saved { text-align: left; margin-bottom: 4px; }
-.choose-location-saved > h3 { margin-bottom: 10px; }
-.choose-location-saved-list { display: grid; gap: 8px; max-height: 168px; overflow-y: auto; }
-.choose-location-saved-list .MuiButton-root { justify-content: flex-start; gap: 10px; padding: 9px 12px; }
-.choose-location-saved-list .MuiButton-root svg { flex: 0 0 auto; }
-.choose-location-saved-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
-.choose-location-saved-text strong { font-size: 12px; color: #17392c; }
-.choose-location-saved-text span { font-size: 11px; color: #66746c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media(max-width:360px){.saved-location-actions{flex-direction:column;align-items:flex-end}.saved-location-actions .MuiButton-root{padding:2px}.location-modal-heading{padding-right:26px}}
+@media(prefers-reduced-motion:reduce){.choose-location-dialog *{transition:none!important}}

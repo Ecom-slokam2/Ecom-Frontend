@@ -186,6 +186,7 @@ const router = createBrowserRouter([
       { path: "team-login", element: <RoleLoginPage /> },
       { path: "admin/*", element: <ProtectedRoute roles={['super-admin', 'global-admin', 'location-admin', 'store-manager']}><AdminWorkspace /></ProtectedRoute> },
       { path: "store-manager/dashboard", element: <ProtectedRoute roles={['store-manager']}><StoreManagerPortal page="dashboard" /></ProtectedRoute> },
+      { path: "store-manager/products", element: <ProtectedRoute roles={['store-manager']}><StoreManagerPortal page="products" /></ProtectedRoute> },
       { path: "store-manager/profile", element: <ProtectedRoute roles={['store-manager']}><StoreManagerPortal page="profile" /></ProtectedRoute> },
       { path: "store-manager/orders", element: <ProtectedRoute roles={['store-manager']}><Navigate to="/admin/orders" replace /></ProtectedRoute> },
       { path: "store-manager/delivery-partners", element: <ProtectedRoute roles={['store-manager']}><StoreManagerPortal page="delivery-partners" /></ProtectedRoute> },

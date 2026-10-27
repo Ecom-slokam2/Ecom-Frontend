@@ -8,7 +8,7 @@ import { getCachedStoreDeliveryQuote } from '../../services/catalogApi';
 import { deliverySummary } from '../../utils/storeDelivery';
 import fallbackProductImage from '../../assets/images/mango_pickle_jar.png';
 import './ProductCard.css';
-import { findInventoryForItem } from '../../services/inventoryApi';
+import { getPublicInventoryAvailability } from '../../services/inventoryApi';
 import { loadProductStock } from '../../utils/productStock.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -44,14 +44,14 @@ const ProductCard = ({ title, weight, price, image, ...details }) => {
   const cardRef = useRef(null);
   const [inView, setInView] = useState(typeof IntersectionObserver === 'undefined');
   useEffect(() => {
-    if (!user?.id || !inView || !stockStoreId || !productId) return undefined;
+    if (!inView || !stockStoreId || !productId) return undefined;
     let active = true;
     (async () => {
       let firstUnavailable = null;
       let lookupFailed = false;
       for (const variant of productVariantsRef.current) {
         const candidateId = variant.variantId ?? variant.id ?? null;
-        const result = await loadProductStock(findInventoryForItem, { storeId: stockStoreId, productId, variantId: dbVariantId(candidateId) });
+        const result = await loadProductStock(getPublicInventoryAvailability, { storeId: stockStoreId, productId, variantId: dbVariantId(candidateId) });
         if (!active) return;
         if (result.state === 'available') {
           setAvailableVariantResult({ scope: stockScope, variant });
@@ -66,9 +66,9 @@ const ProductCard = ({ title, weight, price, image, ...details }) => {
     return () => { active = false; };
   }, [user?.id, inView, stockStoreId, productId, variantScope, stockScope, stockAttempt]);
   const currentStock = stockForScope;
-  const checkingStock = Boolean(user?.id && !currentStock);
-  const stockError = Boolean(user?.id && currentStock?.state === 'error');
-  const noStock = Boolean(user?.id && currentStock && currentStock.state !== 'available');
+  const checkingStock = Boolean(!currentStock);
+  const stockError = Boolean(currentStock?.state === 'error');
+  const noStock = Boolean(currentStock && currentStock.state !== 'available');
   useEffect(() => {
     const node = cardRef.current;
     if (!node || inView) return undefined;
@@ -191,7 +191,7 @@ const ProductCard = ({ title, weight, price, image, ...details }) => {
                 -
               </button>
               <Typography className="qty-count-text">{quantity}</Typography>
-              <button type="button" className="qty-action-btn" disabled={cartLoading || checkingStock || noStock || (user?.id && currentStock?.available <= quantity)} onClick={handleIncrement}>
+              <button type="button" className="qty-action-btn" disabled={cartLoading || checkingStock || noStock} onClick={handleIncrement}>
                 +
               </button>
             </Box>

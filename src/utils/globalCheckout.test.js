@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isGlobalProduct, deliveryProducts } from './storeDelivery.js';
-import { validateGlobalCheckout, checkoutErrorMessage } from './globalCheckout.js';
+import { validateCartProducts, validateGlobalCheckout, checkoutErrorMessage } from './globalCheckout.js';
 
 test('category and stale global labels cannot grant eligibility', () => {
   for (const globalProduct of [false, undefined]) {
@@ -23,6 +23,19 @@ test('saved global carts are checked against current catalog eligibility', async
 test('local checkout does not require global eligibility', async () => {
   await validateGlobalCheckout([{ line: { fulfillmentType: 'nearby' }, items: [{ productId: 'p' }] }],
     async () => { assert.fail('Local item should not be checked'); });
+});
+
+test('checkout stops with an actionable message when a cart product no longer exists', async () => {
+  await assert.rejects(
+    validateCartProducts([{ productId: 'stale-id', productName: 'Premium Cashew Nuts' }], async () => {
+      throw Object.assign(new Error('Not found'), { status: 404 });
+    }),
+    /Premium Cashew Nuts is no longer available in the catalog.*add the current catalog item/,
+  );
+  await validateCartProducts([{ productId: 'current-id' }], async () => ({ id: 'current-id' }));
+  await assert.rejects(validateCartProducts([{ productId: 'p' }], async () => {
+    throw Object.assign(new Error('Catalog offline'), { status: 503 });
+  }), /Catalog offline/);
 });
 
 test('checkout preserves backend explanations with old and new status codes', () => {

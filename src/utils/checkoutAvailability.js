@@ -13,14 +13,14 @@ export const validateCheckoutAvailability = async (stores, lookup) => {
       throw new Error('Inventory availability could not be checked. No new checkout was submitted.', { cause: reason });
     }
     const selectedVariant = item.variantId ?? null;
-    const variantMatches = selectedVariant ? (stock?.variantId ?? null) === selectedVariant : true;
-    if (stock?.storeId !== store.storeId || stock?.productId !== item.productId || !variantMatches) {
+    const variantMatches = String(stock?.variantId ?? '') === String(selectedVariant ?? '');
+    if (String(stock?.storeId) !== String(store.storeId) || String(stock?.productId) !== String(item.productId) || !variantMatches) {
       throw new Error('Inventory response does not match the selected store and variant.');
     }
-    if (!Number.isInteger(stock.availableQuantity) || stock.availableQuantity < 0) throw new Error('Inventory availability could not be verified.');
-    if (stock.status !== 'ACTIVE' || stock.availableQuantity < item.quantity) unavailable.push(`${item.productName || 'Item'}: insufficient stock at ${store.storeId}`);
+    if (typeof stock.available !== 'boolean') throw new Error('Inventory availability could not be verified.');
+    if (!stock.available) unavailable.push(`${item.productName || 'Item'}: unavailable at ${store.storeId}`);
   }
   if (unavailable.length) throw new Error(`${unavailable.join('; ')}. No new checkout was submitted. An authorized inventory update is required for these items.`);
   // This is a read-only preflight; the backend's locked reservations remain authoritative.
 };
- 
+

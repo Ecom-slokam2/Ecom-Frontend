@@ -97,7 +97,7 @@ Success changes shipment to DELIVERED and adds a tracking event. This is indepen
 
 ## D04 — History and performance
 
-Entry `/delivery/history`. Delivered, failed, cancelled and returned outcomes have separate labels/colors. Partner can filter/search/sort history, expand details and inspect outcome/performance charts.
+Entry `/delivery/history`. Delivered, failed, cancelled and returned outcomes have separate labels/colors. Partner can filter/search/sort history and expand details, including the authorized shipment tracking-event timeline. The dashboard provides outcome/performance charts.
 
 Time aggregation selects daily buckets up to 31 days, weekly up to 98 and monthly thereafter. History date uses delivered timestamp or shipment update time, falling back to creation. These charts summarize returned assignments, not earnings or payroll.
 
@@ -109,4 +109,4 @@ Source: [DeliveryNavigationPage](../../src/pages/DeliveryNavigationPage/Delivery
 
 Displayed distance is straight-line distance; estimated time assumes 25 km/h with minimum five minutes. It is not the catalog driving-route quote.
 
-GPS/geocoding failure can substitute hard-coded Hyderabad coordinates, and direct navigation without order state uses a fallback destination. Therefore a displayed route must be checked against the real delivery address before being described as reliable navigation.
+Navigation requires an assigned order in route state, a usable shipping destination, and a valid browser GPS reading. If GPS is denied/unavailable or the destination cannot be resolved, the page reports the problem instead of displaying a route based on fallback coordinates. Displayed distance is straight-line distance; estimated time assumes 25 km/h with minimum five minutes. It is not the catalog driving-route quote.

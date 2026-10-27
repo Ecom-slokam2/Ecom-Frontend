@@ -14,7 +14,7 @@ import ProductCard from '../../components/ProductCard/ProductCard';
 import CampaignCarousel from '../../components/CampaignCarousel/CampaignCarousel';
 import { AppContext } from '../../context/AppContext';
 import { promotionApplies } from '../../services/promotionScope';
-import { getCachedStoreDeliveryQuote, getStoreProducts } from '../../services/catalogApi';
+import { getCachedStoreDeliveryQuote, getPublicStoreProducts } from '../../services/catalogApi';
 import { adaptStoreProductList } from '../../services/catalogAdapter';
 import { deliverySummary, isGlobalProduct, isGlobalStore, isProductEligibleForStore, storeDeliversTo } from '../../utils/storeDelivery';
 import StoreServiceAreaMap from '../../components/StoreServiceAreaMap/StoreServiceAreaMap';
@@ -37,7 +37,7 @@ const StorePage = () => {
 
   useEffect(() => {
     let ignore = false;
-    getStoreProducts(storeId, { status: 'ACTIVE' })
+    getPublicStoreProducts(storeId, { status: 'ACTIVE' })
       .then((payload) => {
         if (!ignore) setStoreProducts(adaptStoreProductList(payload || []).map((item) => ({ ...item, storeId: item.storeId || storeId })));
       })
@@ -121,7 +121,7 @@ const StorePage = () => {
       <Box sx={{ display:'flex', gap:1, mt:2, alignItems:'center', flexWrap:'wrap' }}>
         <Button variant={deliveryMode === 'delivery' ? 'contained' : 'outlined'} disabled={store.delivery === 'No'} onClick={() => setDeliveryMode('delivery')}>Delivery</Button>
         <Button variant={deliveryMode === 'pickup' ? 'contained' : 'outlined'} disabled={store.pickup === 'No'} onClick={() => setDeliveryMode('pickup')}>Pick-up</Button>
-        <Button sx={{ ml:{ xs:0, sm:'auto' } }} variant="contained" color="success" onClick={() => navigate('/cart')}>View basket Â· {cartCount}</Button>
+        <Button sx={{ ml:{ xs:0, sm:'auto' } }} variant="contained" color="success" onClick={() => navigate('/cart')}>View basket · {cartCount}</Button>
       </Box>
     </Box>
     <CampaignCarousel banners={banners} onNavigate={navigate} />

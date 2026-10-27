@@ -52,9 +52,7 @@ Actions include create/edit/status handling, duplicate and delete where rendered
 
 ## A08 — Banners and campaigns
 
-Entry includes title, description, desktop image, optional mobile image, start/end dates, sort order, target URL and Active/Scheduled/Inactive status. Desktop image/title/status required.
-
-Role-derived promotion scope is applied rather than exposing the original generic scope/location/store fields. Location Admin can optionally target a specific store. Catalog banner calls persist banner records. Customer visibility also depends on dates/status/scope and storefront selection.
+Entry includes title, description, desktop image, optional mobile image, start/end dates, sort order, target URL and Active/Scheduled/Inactive status. Desktop image/title/status required. Store Managers may read and manage banners only for their assigned store. The form omits scope/location/store controls; the API derives and enforces the assigned store from authenticated identity and rejects attempts to target another store or broader scope. Location Admin can optionally target a specific store. Catalog banner calls persist banner records. Customer visibility also depends on dates/status/scope and storefront selection.
 
 ## A09 — Inventory
 
@@ -112,9 +110,9 @@ This moderation flow is separate from backend order reviews. There is no demonst
 
 ## A16 — Coupon configuration
 
-Fields include code, name, description, fixed/percentage discount, value, minimum order, maximum discount, start/expiry dates, usage/per-user limits, product/category targeting, eligibility and state. Code/name/type/value/dates/usage limit/eligibility/state are required in schema.
+Fields include code, name, description, fixed/percentage discount, value, minimum order, maximum discount, start/expiry dates, usage/per-user limits, product/category targeting, eligibility and state. Code/name/type/value/dates/usage limit/eligibility/state are required in schema. Store Managers may read and manage coupons only for their assigned store; scope is derived and enforced by the API from authenticated identity, and the form does not offer scope/location/store overrides. Location Admin can select a target store within its assigned location.
 
-Expiry cannot precede start date. Role scope is derived; Location Admin can select a target store. Duplicate is available. Local configuration does not activate customer redemption: checkout coupons remain disabled. Usage/eligibility fields should not be represented as server-enforced redemption rules.
+Expiry cannot precede start date. Duplicate is available. Local configuration does not activate customer redemption: checkout coupons remain disabled. Usage/eligibility fields should not be represented as server-enforced redemption rules.
 
 ## A17 — Notifications
 

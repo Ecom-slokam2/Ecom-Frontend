@@ -5,7 +5,6 @@ import HomeIcon from '@mui/icons-material/Home';
 import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { useNavigate } from 'react-router-dom';
 import Header from '../../components/Header/Header';
 import BottomNav from '../../components/BottomNav/BottomNav';
@@ -52,9 +51,9 @@ const SavedAddressesPage = () => {
               <Button size="small" color="error" onClick={() => deleteAddress(loc.id)}>Delete</Button>
             </Box>
 
-            <IconButton size="small" aria-label={`Edit ${loc.type} address`} onClick={() => navigate('/address-form', { state: { editAddress: loc } })}>
-              <MoreVertIcon style={{ color: '#64748b' }} />
-            </IconButton>
+            <Button size="small" aria-label={`Edit ${loc.type} address`} onClick={() => navigate('/address-form', { state: { editAddress: loc, returnTo: '/saved-addresses' } })}>
+              Edit
+            </Button>
           </Box>
         ))}
       </Box>

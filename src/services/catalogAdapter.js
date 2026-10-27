@@ -1,5 +1,5 @@
 import { numericValue } from '../utils/productBrowsing.js';
-import { normalizeProductImageUrl, parseVariantAttributes, variantChoiceLabel } from '../utils/productVariantData.js';
+import { normalizeProductImageUrl, normalizeWeightLabel, parseVariantAttributes, variantChoiceLabel } from '../utils/productVariantData.js';
 import { bannerImageFor, categoryImageFor, productImageFor } from './categoryImages';
 export { parseVariantAttributes, variantChoiceLabel } from '../utils/productVariantData.js';
 
@@ -74,7 +74,7 @@ export const adaptVariant = (variant, fallbackProduct = {}) => {
     priceKnown: numericValue(variant?.price ?? variant?.sellingPrice ?? variant?.mrp) !== null,
     attributes,
     active: variant?.active ?? true,
-    weight: extractWeight(variant, fallbackProduct.weight || ''),
+    weight: normalizeWeightLabel(extractWeight(variant, fallbackProduct.weight || '')),
     image: safeImageUrl(variant?.image || fallbackProduct.image),
     compareAtPrice: compareAt > price ? compareAt : price,
   };
@@ -107,6 +107,33 @@ export const adaptStoreProduct = (storeProduct) => {
     priceOverride: pickPrice(storeProduct?.priceOverride ?? storeProduct?.overridePrice),
     status: storeProduct?.status || 'ACTIVE',
   };
+};
+
+// Location master records use the Catalog store endpoint as their durable store,
+// with an explicit ID prefix so they never appear as retail stores.
+export const adaptLocation = (location = {}) => ({
+  ...location,
+  id: location.id || location.storeId,
+  name: location.name || location.title || '',
+  code: location.code || location.storeCode || '',
+  address: location.address || '',
+  city: location.city || '',
+  state: location.state || '',
+  country: location.country || '',
+  pincode: location.pincode || '',
+  latitude: location.latitude,
+  longitude: location.longitude,
+  phone: location.phone || '',
+  email: location.email || '',
+  admin: location.adminName || location.admin || '',
+  status: location.status || (location.active === false ? 'Inactive' : 'Active'),
+  _isLocationRecord: true,
+});
+
+export const isLocationRecord = (record = {}) => String(record.id || '').startsWith('location-');
+export const adaptLocationList = (payload) => {
+  const items = Array.isArray(payload) ? payload : payload?.content || payload?.items || payload?.data || [];
+  return items.filter(isLocationRecord).map(adaptLocation);
 };
 
 export const adaptProduct = (product) => {
@@ -160,7 +187,7 @@ export const adaptProduct = (product) => {
     offerPrice: pickPrice(variant?.price ?? 0),
     compareAtPrice: pickPrice(variant?.compareAtPrice ?? variant?.price ?? 0),
     sku: variant?.sku || product?.sku || product?.productCode || '',
-    weight: variant?.weight || extractWeight(variant, product?.weight || '500g'),
+    weight: normalizeWeightLabel(variant?.weight || extractWeight(variant, product?.weight || '500g')),
     variantId: variant?.variantId || variant?.id || null,
     variants: variants.length ? variants : [variant],
     catalogVariants: variants,

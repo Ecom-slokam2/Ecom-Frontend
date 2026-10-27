@@ -1,6 +1,65 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { orgAccessService } from './orgAccessService.js';
+import { orgAccessService, teamLandingPath } from './orgAccessService.js';
+
+test('administrators land in the admin dashboard while delivery roles keep their own landing pages', () => {
+  assert.equal(teamLandingPath('super-admin'), '/admin/dashboard');
+  assert.equal(teamLandingPath('global-admin'), '/admin/dashboard');
+  assert.equal(teamLandingPath('location-admin'), '/admin/dashboard');
+  assert.equal(teamLandingPath('store-manager'), '/store-manager/dashboard');
+  assert.equal(teamLandingPath('delivery-partner'), '/delivery');
+  assert.equal(teamLandingPath('customer'), '/unauthorized');
+});
+
+test('Location Admin provisioning payload carries location scope without Global Admin or store ownership', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalStorage = globalThis.sessionStorage;
+  const originalWindow = globalThis.window;
+  globalThis.sessionStorage = { getItem: () => 'header.eyJleHAiOjQxMDI0NDQ4MDB9.signature' };
+  globalThis.window = { dispatchEvent: () => {} };
+  let request;
+  globalThis.fetch = async (url, options) => {
+    request = { url, options };
+    return new Response('{}', { status: 201 });
+  };
+  try {
+    await orgAccessService.createUser({
+      username: 'location-admin', email: 'location@example.com', password: 'ValidPass123',
+      role: 'location-admin', location: 'Hyderabad', storeLocation: 'Hyderabad', storeAddress: 'Should not be sent',
+    });
+    const body = JSON.parse(request.options.body);
+    assert.equal(body.role, 'LOCATION_ADMIN');
+    assert.equal(body.location, 'hyderabad');
+    assert.equal(body.storeLocation, null);
+    assert.equal(body.storeAddress, null);
+    assert.equal(body.storeId, null);
+    assert.equal(body.store, null);
+  } finally { globalThis.fetch = originalFetch; globalThis.sessionStorage = originalStorage; globalThis.window = originalWindow; }
+});
+
+test('Global Admin provisioning payload does not inherit a selected location', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalStorage = globalThis.sessionStorage;
+  const originalWindow = globalThis.window;
+  globalThis.sessionStorage = { getItem: () => 'header.eyJleHAiOjQxMDI0NDQ4MDB9.signature' };
+  globalThis.window = { dispatchEvent: () => {} };
+  let request;
+  globalThis.fetch = async (url, options) => {
+    request = { url, options };
+    return new Response('{}', { status: 201 });
+  };
+  try {
+    await orgAccessService.createUser({
+      username: 'global-admin', email: 'global@example.com', password: 'ValidPass123',
+      role: 'global-admin', location: 'Hyderabad',
+    });
+    const body = JSON.parse(request.options.body);
+    assert.equal(body.role, 'GLOBAL_ADMIN');
+    assert.equal(body.location, null);
+    assert.equal(body.storeLocation, null);
+    assert.equal(body.storeId, null);
+  } finally { globalThis.fetch = originalFetch; globalThis.sessionStorage = originalStorage; globalThis.window = originalWindow; }
+});
 
 test('staff update sends a scoped PUT payload to the numeric user endpoint', async () => {
   const originalFetch = globalThis.fetch;
@@ -29,6 +88,28 @@ test('staff update sends a scoped PUT payload to the numeric user endpoint', asy
 
 test('staff update rejects an invalid ID before making a request', async () => {
   await assert.rejects(orgAccessService.updateUser('not-a-database-id', {}), /valid staff account ID/);
+});
+
+test('staff delete sends an authenticated DELETE to the numeric user endpoint', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalStorage = globalThis.sessionStorage;
+  const originalWindow = globalThis.window;
+  globalThis.sessionStorage = { getItem: () => 'header.eyJleHAiOjQxMDI0NDQ4MDB9.signature' };
+  globalThis.window = { dispatchEvent: () => {} };
+  let request;
+  globalThis.fetch = async (url, options) => {
+    request = { url, options };
+    return new Response(null, { status: 204 });
+  };
+  try {
+    await orgAccessService.deleteUser(21);
+    assert.match(request.url, /\/api\/users\/21$/);
+    assert.equal(request.options.method, 'DELETE');
+  } finally { globalThis.fetch = originalFetch; globalThis.sessionStorage = originalStorage; globalThis.window = originalWindow; }
+});
+
+test('staff delete rejects an invalid ID before making a request', async () => {
+  await assert.rejects(orgAccessService.deleteUser('not-a-database-id'), /valid staff account ID/);
 });
 
 test('Super Admin profile update sends only the authenticated user name', async () => {

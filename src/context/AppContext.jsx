@@ -6,15 +6,17 @@ import { createContext, useState, useEffect, useMemo, useRef } from 'react';
 import { readSelectedLocation, storeSelectedLocation, clearSelectedLocation as resetSelectedLocation } from '../utils/selectedLocation';
 import { customerProfileService } from '../services/customerProfileService';
 import { getCustomerOrders, normalizeOrder, orderDeliveryAddress } from '../services/orderApi';
-import { getProducts, getCategories, getCategoryProducts, getStoreProducts, getStores, getBanners } from '../services/catalogApi';
+import { getProducts, getCategories, getCategoryProducts, getPublicStoreProducts, getStoreProducts, getStores, getBanners } from '../services/catalogApi';
 import { adaptProductList, adaptCategoryList, adaptStoreProductList, adaptBannerList } from '../services/catalogAdapter';
 import { addCartItem, calculateCartTotal, clearCartItems, createCart, getActiveCart, getActiveCarts, getCart, moveSavedCartItemToCart, removeCartItem, saveCartItemForLater, updateCartItem } from '../services/cartApi';
 import { rememberProductStore, resolveProductStore } from '../services/productStoreResolver';
 import { cleanDisplayText } from '../utils/textEncoding';
-import { findInventoryForItem } from '../services/inventoryApi';
+import { getPublicInventoryAvailability } from '../services/inventoryApi';
 import { migrateGuestCart } from '../utils/migrateGuestCart.js';
 import { loadCustomerCart } from '../utils/loadCustomerCart.js';
 import { planCartLineMutation, sameCartLine } from '../utils/cartLineMutation.js';
+import { mutateAuthenticatedCart } from '../utils/authenticatedCart.js';
+import { mergeCartResponseItems } from '../utils/mergeCartResponseItems.js';
 import { logCartDiagnostic, logCartSnapshot } from '../utils/cartDiagnostics.js';
 import { validateCheckoutAvailability } from '../utils/checkoutAvailability';
 import { isCustomerSession, resolveCustomerId } from '../utils/customerSession.js';
@@ -40,6 +42,10 @@ const tokenCustomerId = () => {
 };
 
 export const AppProvider = ({ children }) => {
+  const [sessionToken, setSessionToken] = useState(() => {
+    try { return sessionStorage.getItem('authToken') || ''; }
+    catch { return ''; }
+  });
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try {
       const token = sessionStorage.getItem('authToken');
@@ -47,6 +53,8 @@ export const AppProvider = ({ children }) => {
       return claims.exp * 1000 > Date.now();
     } catch { return false; }
   });
+  const [authReady, setAuthReady] = useState(() => !isLoggedIn);
+  const [authError, setAuthError] = useState('');
 
   const guestCartItemsRef = useRef([]);
   const readGuestCartItems = () => guestCartItemsRef.current;
@@ -119,6 +127,26 @@ export const AppProvider = ({ children }) => {
         }
       : {};
     const source = resolveProductStore({ ...cartStore, ...item }, catalogProducts) || {};
+    const cartPrice = Number(item?.unitPrice ?? item?.price ?? 0);
+    const storeMapping = catalogStoreProducts.find((mapping) =>
+      String(mapping.productId || '') === String(item?.productId || '')
+      && String(mapping.storeId || '') === String(item?.storeId || cartStore.storeId || ''),
+    );
+    const catalogProduct = storeMapping?.product
+      || catalogProducts.find((product) => String(product.productId || product.id || '') === String(item?.productId || ''));
+    const catalogVariant = catalogProduct?.variants?.find((variant) =>
+      String(variant.variantId || variant.id || '') === String(item?.variantId || ''),
+    );
+    const mappedPrice = Number(storeMapping?.priceOverride);
+    const catalogPrice = mappedPrice > 0
+      ? mappedPrice
+      : Number(catalogVariant?.price ?? (item?.variantId == null ? catalogProduct?.price : 0));
+    // Old cart records can retain a zero price after catalog products load.
+    // Keep a valid cart price, but recover missing/invalid prices from the
+    // selected store mapping or the matching catalog variant.
+    const unitPrice = Number.isFinite(cartPrice) && cartPrice > 0
+      ? cartPrice
+      : Number.isFinite(catalogPrice) && catalogPrice > 0 ? catalogPrice : 0;
     return {
       ...source,
       ...cartStore,
@@ -132,10 +160,10 @@ export const AppProvider = ({ children }) => {
       variantId: item?.variantId ?? null,
       productName: cleanDisplayText(item?.productName || item?.title || 'Product'),
       quantity: Number(item?.quantity || 0),
-      unitPrice: Number(item?.unitPrice ?? item?.price ?? 0),
-      totalPrice: Number(item?.totalPrice ?? Number(item?.unitPrice ?? item?.price ?? 0) * Number(item?.quantity || 0)),
+      unitPrice,
+      totalPrice: unitPrice * Number(item?.quantity || 0),
       title: cleanDisplayText(item?.productName || item?.title || 'Product'),
-      price: Number(item?.unitPrice ?? item?.price ?? 0),
+      price: unitPrice,
       weight: cleanDisplayText(item?.weight || (item?.variantId == null ? 'Product-level item' : String(item.variantId))),
     };
   };
@@ -147,6 +175,29 @@ export const AppProvider = ({ children }) => {
 
   const savedItemsFromResponse = (cart) => (Array.isArray(cart?.savedForLaterItems) ? cart.savedForLaterItems : [])
     .map((item) => adaptCartItem(item, cart));
+
+  useEffect(() => {
+    if (!catalogProducts.length && !catalogStoreProducts.length) return undefined;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setCartItems((current) => {
+        let repaired = false;
+        const next = current.map((item) => {
+          if (Number(item.unitPrice ?? item.price) > 0) return item;
+          const refreshed = adaptCartItem(item);
+          if (refreshed.unitPrice <= 0) return item;
+          repaired = true;
+          return refreshed;
+        });
+        return repaired ? next : current;
+      });
+    });
+    return () => { active = false; };
+  // The adapter intentionally uses the latest catalog snapshots; including its
+  // per-render function identity here would cause a repeated effect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogProducts, catalogStoreProducts]);
 
   const applyCartResponse = (cart) => {
     setActiveCart(cart || null);
@@ -163,13 +214,7 @@ export const AppProvider = ({ children }) => {
     const cartId = cart?.id || '';
     setActiveCart(cart || null);
     if (cartId) setSavedForLater((items) => [...items.filter((item) => item.cartId !== cartId), ...savedItemsFromResponse(cart)]);
-    setCartItems((current) => [
-      ...current.filter((item) => {
-        if (cartId && item.cartId) return item.cartId !== cartId;
-        return storeId ? String(item.storeId || '') !== String(storeId) : true;
-      }),
-      ...incoming,
-    ]);
+    setCartItems((current) => mergeCartResponseItems(current, incoming, { cartId, storeId }));
     setCartUnavailable(false);
     setCartError('');
     return cart;
@@ -265,13 +310,13 @@ export const AppProvider = ({ children }) => {
       .catch((error) => console.warn('Could not refresh banners:', error.message));
     const storesRequest = getStores()
       .then((response) => {
-        setCatalogStores(Array.isArray(response) ? response : response?.content || response?.items || []);
+        setCatalogStores((Array.isArray(response) ? response : response?.content || response?.items || []).filter((store) => !String(store.id || '').startsWith('location-')));
       })
       .catch(() => {
         setCatalogStores([]);
         setCatalogError('Delivery stores could not be loaded. Please retry in a moment.');
       });
-    const storeRequest = getStoreProducts('', { status: 'ACTIVE' });
+    const storeRequest = getPublicStoreProducts('', { status: 'ACTIVE' });
     const mappingsRequest = Promise.all([productsRequest, storeRequest])
       .then(([products, response]) => {
         const byId = new Map(products.map((product) => [product.productId, product]));
@@ -319,25 +364,46 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     let active = true;
-    const token = sessionStorage.getItem('authToken');
+    const token = sessionToken;
     if (!isLoggedIn || !token) return undefined;
     const customerId = tokenCustomerId();
     const request = customerId ? customerAuthService.me() : orgAccessService.me();
     request.then((account) => {
       if (!active) return;
       setUser({ ...account, id: customerId || account.id, role: customerId ? 'customer' : account.role });
+      setAuthReady(true);
     }).catch((error) => {
       if (!active) return;
       if (error.status === 401) {
         sessionStorage.removeItem('authToken');
+        setSessionToken('');
         setIsLoggedIn(false);
         setUser(null);
-      }
+        setAuthError('');
+      } else setAuthError('Your account could not be verified right now. Retry after the identity service is available.');
+      setAuthReady(true);
       // Keep the session token during a temporary service outage; the account
       // can be loaded again from its database after the service recovers.
     });
     return () => { active = false; };
-  }, [isLoggedIn]);
+  }, [isLoggedIn, sessionToken]);
+  useEffect(() => {
+    if (user?.role !== 'location-admin') return undefined;
+    let active = true;
+    getStoreProducts().then((response) => {
+      if (!active) return;
+      const productsById = new Map(catalogProducts.map((product) => [String(product.productId || product.id), product]));
+      const mappings = adaptStoreProductList(response || [])
+        .filter((mapping) => mapping.available !== false)
+        .map((mapping) => ({ ...mapping, product: mapping.product || productsById.get(String(mapping.productId)) || null }));
+      setCatalogStoreProducts(mappings);
+      setCatalogError(null);
+    }).catch((error) => {
+      if (!active) return;
+      setCatalogError(error.message || 'Location product mappings could not be loaded. Please retry.');
+    });
+    return () => { active = false; };
+  }, [user?.role, user?.id, catalogProducts]);
   useEffect(() => {
     const token = sessionStorage.getItem('authToken');
     if (!isLoggedIn || !isCustomerSession({ role: user?.role, tokenCustomerId: tokenCustomerId() }) || !token || token.startsWith('local-')) return;
@@ -369,7 +435,9 @@ export const AppProvider = ({ children }) => {
   const login = (authenticatedUser, token) => {
     cartHydrationRequest.current += 1;
     setCartLoading(false);
+    const nextToken = token || sessionStorage.getItem('authToken') || '';
     if (token) sessionStorage.setItem('authToken', token);
+    setSessionToken(nextToken);
     const customerId = tokenCustomerId();
     const accountUser = customerId ? { ...authenticatedUser, id: customerId } : authenticatedUser;
     if (isLoggedIn && accountUser?.id !== user?.id) {
@@ -381,6 +449,8 @@ export const AppProvider = ({ children }) => {
     setAddresses([]);
     setOrderAddresses([]);
     setUser(accountUser || null);
+    setAuthError('');
+    setAuthReady(true);
     if (accountUser?.locale) updateLocale(accountUser.locale);
     setIsLoggedIn(true);
   };
@@ -392,7 +462,10 @@ export const AppProvider = ({ children }) => {
     setWishlistItems([]); setSavedForLater([]); setAddresses([]); setOrderAddresses([]);
     setIsLoggedIn(false);
     setUser(null);
+    setAuthError('');
+    setAuthReady(true);
     sessionStorage.removeItem('authToken');
+    setSessionToken('');
     setCartItems([]);
     guestCartItemsRef.current = [];
     setActiveCart(null);
@@ -404,13 +477,13 @@ export const AppProvider = ({ children }) => {
     let timer;
     if (isLoggedIn) {
       try {
-        const token = sessionStorage.getItem('authToken');
+        const token = sessionToken;
         const claims = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
         timer = setTimeout(expire, Math.max(0, claims.exp * 1000 - Date.now()));
       } catch { timer = setTimeout(expire, 0); }
     }
     return () => { clearTimeout(timer); window.removeEventListener('customer-session-expired', expire); };
-  }, [isLoggedIn]);
+  }, [isLoggedIn, sessionToken]);
 
   const [addedToCartPopup, setAddedToCartPopup] = useState(null);
 
@@ -581,7 +654,7 @@ export const AppProvider = ({ children }) => {
           quantity: nextQuantity,
           source: 'server API',
         });
-        await validateCheckoutAvailability([{ storeId: itemPayload.storeId, items: [{ ...itemPayload, quantity: nextQuantity }] }], findInventoryForItem);
+        await validateCheckoutAvailability([{ storeId: itemPayload.storeId, items: [{ ...itemPayload, quantity: nextQuantity }] }], getPublicInventoryAvailability);
         if (mutation.type === 'update') {
           await updateCartItem(cart.id, mutation.line.id, { quantity: nextQuantity });
         } else {
@@ -631,21 +704,21 @@ export const AppProvider = ({ children }) => {
       logCartSnapshot('guest.quantity.after', readGuestCartItems().map(adaptCartItem), 'guest in-memory cart');
       return true;
     }
-    const cartId = current.cartId;
-    if (!cartId || !current?.id) return;
+    const targetStoreId = current.storeId || storeId || resolveCartStoreId(current);
+    if (!targetStoreId) return false;
     cartMutationPending.current = true;
     setCartLoading(true);
     try {
-      if (isLoggedIn && currentCustomerId() && Number(delta) > 0) {
-        await validateCheckoutAvailability([{ storeId: current.storeId, items: [{ ...current, quantity: nextQuantity }] }], findInventoryForItem);
-      }
       setCartError('');
-      if (nextQuantity <= 0) {
-        await removeCartItem(cartId, current.id);
-      } else {
-        await updateCartItem(cartId, current.id, { quantity: nextQuantity });
-      }
-      await refreshCartTotal(cartId, { mergeStoreItems: true });
+      const result = await mutateAuthenticatedCart({
+        customerId: currentCustomerId(), storeId: targetStoreId,
+        item: { ...current, quantity: Number(current.quantity || 1) },
+        operation: 'update', delta: Number(delta || 0),
+        api: { getActiveCart, createCart, addCartItem, updateCartItem, removeCartItem, clearCartItems },
+        checkInventory: (stores) => validateCheckoutAvailability(stores, getPublicInventoryAvailability),
+        onReconciled: mergeCartResponse,
+      });
+      mergeCartResponse(result);
     } catch (error) {
       setCartUnavailable(isCartServiceUnavailable(error));
       setCartError(error.message || 'Cart Service is unavailable.');
@@ -675,13 +748,19 @@ export const AppProvider = ({ children }) => {
       logCartSnapshot('guest.remove.after', readGuestCartItems().map(adaptCartItem), 'guest in-memory cart');
       return true;
     }
-    const cartId = current.cartId;
-    if (!cartId || !current?.id) return;
+    const targetStoreId = current.storeId || storeId || resolveCartStoreId(current);
+    if (!targetStoreId) return false;
     cartMutationPending.current = true;
     setCartLoading(true);
     try {
-      await removeCartItem(cartId, current.id);
-      await refreshCartTotal(cartId, { mergeStoreItems: true });
+      const result = await mutateAuthenticatedCart({
+        customerId: currentCustomerId(), storeId: targetStoreId,
+        item: { ...current, quantity: Number(current.quantity || 1) }, operation: 'remove',
+        api: { getActiveCart, createCart, addCartItem, updateCartItem, removeCartItem, clearCartItems },
+        checkInventory: (stores) => validateCheckoutAvailability(stores, getPublicInventoryAvailability),
+        onReconciled: mergeCartResponse,
+      });
+      mergeCartResponse(result);
     } catch (error) {
       setCartUnavailable(isCartServiceUnavailable(error));
       setCartError(error.message || 'Cart Service is unavailable.');
@@ -701,18 +780,24 @@ export const AppProvider = ({ children }) => {
       logCartSnapshot('guest.clear.after', [], 'guest in-memory cart');
       return true;
     }
-    const cartIds = [...new Set(cartItems.map((item) => item.cartId).filter((id) => id && id !== GUEST_CART_ID))];
-    if (!cartIds.length) {
-      applyGuestCartItems([]);
-      return true;
-    }
     cartMutationPending.current = true;
     setCartLoading(true);
     try {
-      const results = await Promise.allSettled(cartIds.map((cartId) => clearCartItems(cartId)));
-      const clearedCartIds = cartIds.filter((_, index) => results[index].status === 'fulfilled');
+      const activeCarts = await getActiveCarts(currentCustomerId());
+      if (!Array.isArray(activeCarts)) throw new Error('Cart Service returned an invalid active-cart list.');
+      const cartsToClear = activeCarts.filter((cart) => cart?.status === 'ACTIVE' && cartItemsFromResponse(cart).length > 0);
+      if (!cartsToClear.length) {
+        setCartItems([]);
+        guestCartItemsRef.current = [];
+        setActiveCart(null);
+        setCartError('');
+        setCartUnavailable(false);
+        return true;
+      }
+      const results = await Promise.allSettled(cartsToClear.map((cart) => clearCartItems(cart.id)));
+      const clearedCartIds = cartsToClear.filter((_, index) => results[index].status === 'fulfilled').map((cart) => cart.id);
       setCartItems((items) => items.filter((item) => !clearedCartIds.includes(item.cartId)));
-      if (clearedCartIds.length === cartIds.length) {
+      if (clearedCartIds.length === cartsToClear.length) {
         guestCartItemsRef.current = [];
         setCartItems([]);
         setActiveCart(null);
@@ -733,6 +818,17 @@ export const AppProvider = ({ children }) => {
       setCartLoading(false);
     }
   };
+  const clearCartAfterCheckout = () => {
+    // A successfully claimed checkout cart is immutable on the server. Clear
+    // the local cart view after order creation without sending DELETE against
+    // that CHECKED_OUT cart.
+    guestCartItemsRef.current = [];
+    setCartItems([]);
+    setActiveCart(null);
+    setCartError('');
+    setCartUnavailable(false);
+    return true;
+  };
   const toggleWishlist = (product) => setWishlistItems((items) => {
     const itemPayload = buildCartItem(product);
     if (!itemPayload) return items;
@@ -749,9 +845,14 @@ export const AppProvider = ({ children }) => {
   const saveItemForLater = async (product) => {
     const itemPayload = adaptCartItem(product);
     if (!itemPayload?.productId) return;
-    if (isLoggedIn && itemPayload.cartId && itemPayload.id && itemPayload.id !== GUEST_CART_ID) {
+    if (isLoggedIn && itemPayload.storeId) {
       try {
-        applyCartResponse(await saveCartItemForLater(itemPayload.cartId, itemPayload.id));
+        const active = await getActiveCart({ customerId: currentCustomerId(), storeId: itemPayload.storeId });
+        const activeLine = cartItemsFromResponse(active).find((item) => sameCatalogItem(item, itemPayload));
+        if (!activeLine?.id) throw new Error('This item is no longer in an active cart. Refresh your cart and try again.');
+        // A customer can have one active cart per store. Replacing the whole
+        // visible cart from this response dropped every other store's lines.
+        mergeCartResponse(await saveCartItemForLater(active.id, activeLine.id));
         return true;
       } catch (error) {
         setCartError(error.message || 'Could not save this item for later.');
@@ -770,11 +871,14 @@ export const AppProvider = ({ children }) => {
   const removeSavedForLater = async (product) => {
     const itemPayload = adaptCartItem(product);
     if (!itemPayload?.productId) return;
-    if (isLoggedIn && itemPayload.cartId && itemPayload.id && itemPayload.id !== GUEST_CART_ID) {
+    if (isLoggedIn && itemPayload.storeId) {
       try {
-        const cart = await removeCartItem(itemPayload.cartId, itemPayload.id);
+        const active = await getActiveCart({ customerId: currentCustomerId(), storeId: itemPayload.storeId });
+        const savedLine = savedItemsFromResponse(active).find((item) => sameCatalogItem(item, itemPayload));
+        if (!savedLine?.id) throw new Error('This saved item is no longer available. Refresh and try again.');
+        const cart = await removeCartItem(active.id, savedLine.id);
         setSavedForLater((items) => items.filter((item) => !sameCatalogItem(item, itemPayload)));
-        setActiveCart(cart);
+        mergeCartResponse(cart);
         return true;
       } catch (error) {
         setCartError(error.message || 'Could not remove this saved item.');
@@ -789,9 +893,12 @@ export const AppProvider = ({ children }) => {
     const itemPayload = adaptCartItem(product);
     if (!itemPayload?.productId) return;
     const quantity = Math.max(1, Number(itemPayload.quantity || 1));
-    if (isLoggedIn && itemPayload.cartId && itemPayload.id && itemPayload.id !== GUEST_CART_ID) {
+    if (isLoggedIn && itemPayload.storeId) {
       try {
-        applyCartResponse(await moveSavedCartItemToCart(itemPayload.cartId, itemPayload.id));
+        const active = await getActiveCart({ customerId: currentCustomerId(), storeId: itemPayload.storeId });
+        const savedLine = savedItemsFromResponse(active).find((item) => sameCatalogItem(item, itemPayload));
+        if (!savedLine?.id) throw new Error('This saved item is no longer available. Refresh and try again.');
+        mergeCartResponse(await moveSavedCartItemToCart(active.id, savedLine.id));
         return true;
       } catch (error) {
         setCartError(error.message || 'Could not move item back to cart.');
@@ -901,6 +1008,8 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider
       value={{
         isLoggedIn,
+        authReady,
+        authError,
         user,
         setUser,
         login,
@@ -916,6 +1025,7 @@ export const AppProvider = ({ children }) => {
         updateQuantity,
         removeFromCart,
         clearCart,
+        clearCartAfterCheckout,
         catalogProducts,
         catalogStoreProducts,
         catalogCategories,

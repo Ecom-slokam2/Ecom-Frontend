@@ -1,5 +1,6 @@
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
+import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
@@ -11,8 +12,9 @@ import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 
 export const storeManagerNavItems = [
   ['dashboard', 'Dashboard', DashboardOutlinedIcon, '/store-manager/dashboard'],
-  ['products', 'Products', Inventory2OutlinedIcon, '/admin/products'],
+  ['products', 'Products', Inventory2OutlinedIcon, '/store-manager/products'],
   ['banners', 'Banners', ImageOutlinedIcon, '/admin/banners'],
+  ['coupons', 'Coupons', LocalOfferOutlinedIcon, '/admin/coupons'],
   ['inventory', 'Inventory', Inventory2OutlinedIcon, '/admin/inventory'],
   ['orders', 'Orders', ShoppingBagOutlinedIcon, '/admin/orders'],
   ['delivery-partners', 'Delivery Partners', PeopleOutlineIcon, '/store-manager/delivery-partners'],

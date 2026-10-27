@@ -45,8 +45,8 @@ export const adaptInventory = (inventory, context = {}) => {
     createdAt: inventory?.createdAt || null,
     updatedAt: inventory?.updatedAt || null,
     version: inventory?.version,
-    name: product?.name || product?.title || productId || 'Inventory record',
-    sku: variant?.sku || variant?.label || variant?.name || variantId || 'Product-level',
+    name: product?.name || product?.title || (productId ? 'Catalog product missing' : 'Inventory record'),
+    sku: variant?.sku || variant?.label || variant?.name || (product ? variantId || 'Product-level' : productId || variantId || 'Product-level'),
     store: store?.name || storeId || '',
     location: store?.location || '',
     stock: availableQuantity,
@@ -81,15 +81,11 @@ export const toInventoryCreatePayload = (form) => ({
 
 export const toInventoryUpdatePayload = (form) => {
   const payload = {
-    productId: optionalId(form.productId),
-    variantId: optionalId(form.variantId),
-    storeId: optionalId(form.storeId),
     availableQuantity: numberValue(form.availableQuantity),
     reservedQuantity: numberValue(form.reservedQuantity),
     reorderLevel: numberValue(form.reorderLevel),
     status: inventoryStatus(form.status),
   };
-  if (form.version !== undefined) payload.version = form.version;
   return payload;
 };
 

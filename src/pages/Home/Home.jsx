@@ -279,7 +279,7 @@ const Home = () => {
 
       <Box className="home-content-scroll">
         {collection && <Button onClick={() => setCollection('')}>Back to home</Button>}
-        {(catalogLoading || filterLoading) && <Box style={{ padding: '16px 4vw' }}><Typography>Loading catalogâ€¦</Typography></Box>}
+        {(catalogLoading || filterLoading) && <Box style={{ padding: '16px 4vw' }}><Typography>Loading catalog…</Typography></Box>}
         {catalogError && !catalogLoading && <Box style={{ padding: '16px 4vw' }}><Typography color="error">{catalogError}</Typography><Button onClick={loadCatalog}>Retry products</Button></Box>}
         {homeSearchQuery && <Box className="home-search-controls" sx={{ mx: '4vw', mt: 2 }}>
           <Box className="home-search-actions">
@@ -289,7 +289,7 @@ const Home = () => {
           </Box>
           {showSearchFilters && <Box className="home-search-panel">
             <Select size="small" value={searchCategory} onChange={(event) => setSearchCategory(event.target.value)}><MenuItem value="all">All Categories</MenuItem>{sharedCategories.map((category) => <MenuItem key={category.id} value={category.name}>{category.name}</MenuItem>)}</Select>
-            <Select size="small" value={searchPrice} onChange={(event) => setSearchPrice(event.target.value)}><MenuItem value="all">All Prices</MenuItem><MenuItem value="150">Under â‚¹150</MenuItem><MenuItem value="200">Under â‚¹200</MenuItem><MenuItem value="300">Under â‚¹300</MenuItem></Select>
+            <Select size="small" value={searchPrice} onChange={(event) => setSearchPrice(event.target.value)}><MenuItem value="all">All Prices</MenuItem><MenuItem value="150">Under ₹150</MenuItem><MenuItem value="200">Under ₹200</MenuItem><MenuItem value="300">Under ₹300</MenuItem></Select>
             <Select size="small" value={searchRating} onChange={(event) => setSearchRating(event.target.value)}><MenuItem value="all">All Ratings</MenuItem><MenuItem value="4">4 stars & above</MenuItem><MenuItem value="5">5 stars only</MenuItem></Select>
             <Select size="small" value={searchAvailability} onChange={(event) => setSearchAvailability(event.target.value)}><MenuItem value="all">All Availability</MenuItem><MenuItem value="pickup">Pickup Available</MenuItem><MenuItem value="under30">Under 30 min</MenuItem></Select>
             {searchFilterCount > 0 && <Button onClick={resetSearchFilters}>Reset filters</Button>}

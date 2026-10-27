@@ -3,6 +3,7 @@ import { apiRequest } from './apiClient';
 const base = serviceBaseUrl('orgAccess', import.meta.env);
 export const getDeliveryPartners = () => apiRequest(base, '/api/delivery-partners');
 export const createDeliveryPartner = (partner) => apiRequest(base, '/api/delivery-partners', { method: 'POST', body: JSON.stringify(partner) });
+export const updateDeliveryPartner = (id, partner) => apiRequest(base, `/api/delivery-partners/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(partner) });
 export const setDeliveryPartnerActive = (id, active) => apiRequest(base, `/api/delivery-partners/${encodeURIComponent(id)}/status`, { method: 'PUT', body: JSON.stringify({ active }) });
 
 export const getMyDeliveryProfile = () => apiRequest(base, '/api/users/me');
@@ -36,4 +37,5 @@ export const getMyDeliveries = async () => {
 export const assignDatabasePartner = (orderId, partnerId) => apiRequest(base, `/api/delivery/orders/${encodeURIComponent(orderId)}/partner/${encodeURIComponent(partnerId)}`, { method:'PUT' });
 export const deliveryAction = (orderId, action, extra = {}) => apiRequest(base, `/api/delivery/me/orders/${encodeURIComponent(orderId)}/actions`, { method:'POST', body:JSON.stringify({ action, ...extra }) });
 export const requestDeliveryOtp = (orderId) => apiRequest(base, `/api/delivery/me/orders/${encodeURIComponent(orderId)}/otp`, { method:'POST' });
+export const getCustomerDeliveryLocation = (orderId) => apiRequest(base, `/api/delivery/orders/${encodeURIComponent(orderId)}/live-location`);
 

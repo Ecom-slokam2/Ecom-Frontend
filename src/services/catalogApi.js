@@ -17,7 +17,8 @@ const request = (path, options = {}) => {
   if (options.method && options.method !== 'GET') return apiRequest(CATALOG_BASE_URL, path, options);
   const publicReadOptions = { ...options, auth: options.auth ?? false };
   if (publicReadOptions.signal) return apiRequest(CATALOG_BASE_URL, path, publicReadOptions);
-  const key = path;
+  // Keep public storefront reads separate from authenticated admin reads.
+  const key = JSON.stringify([path, publicReadOptions.auth, publicReadOptions.auth === false ? '' : sessionStorage.getItem('authToken') || '']);
   if (!pendingReads.has(key)) {
     pendingReads.set(key, apiRequest(CATALOG_BASE_URL, path, publicReadOptions).finally(() => pendingReads.delete(key)));
   }
@@ -43,7 +44,7 @@ export const getCategoryProducts = async (categoryId, params = {}, options = {})
   return request(`/api/v1/categories/${encodeURIComponent(categoryId)}/products${buildQueryString(params)}`, options);
 };
 
-export const getBanners = async (params = {}) => request(`/api/v1/banners${buildQueryString(params)}`);
+export const getBanners = async (params = {}, options = {}) => request(`/api/v1/banners${buildQueryString(params)}`, options);
 export const createBanner = async (data) => request('/api/v1/banners', { method:'POST', body:JSON.stringify(data) });
 export const updateBanner = async (id, data) => request(`/api/v1/banners/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(data) });
 export const deleteBanner = async (id) => request(`/api/v1/banners/${encodeURIComponent(id)}`, { method:'DELETE' });
@@ -57,17 +58,31 @@ export const setCouponStatus = async (id, status) => request(`/api/v1/coupons/${
 export const deleteCoupon = async (id) => request(`/api/v1/coupons/${encodeURIComponent(id)}`, { method:'DELETE' });
 
 export const getProducts = async (params = {}, options = {}) => request(`/api/v1/products${buildQueryString(params)}`, options);
+export const getLocationProducts = async (params = {}) => request(`/api/v1/location-products${buildQueryString(params)}`, { auth:true });
+export const createLocationProduct = async (data) => request('/api/v1/location-products', { method:'POST', body:JSON.stringify(data) });
+export const updateLocationProduct = async (id, data) => request(`/api/v1/location-products/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(data) });
+export const setLocationProductAvailability = async (id, available) => request(`/api/v1/location-products/${encodeURIComponent(id)}/availability`, { method:'PATCH', body:JSON.stringify({available}) });
+export const deleteLocationProduct = async (id) => request(`/api/v1/location-products/${encodeURIComponent(id)}`, { method:'DELETE' });
+export const getStoreManagerProducts = async (params = {}) => request(`/api/v1/store-manager-products${buildQueryString(params)}`, { auth:true });
+export const createStoreManagerProduct = async (data) => request('/api/v1/store-manager-products', { method:'POST', body:JSON.stringify(data) });
+export const updateStoreManagerProduct = async (id, data) => request(`/api/v1/store-manager-products/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(data) });
+export const setStoreManagerProductAvailability = async (id, available) => request(`/api/v1/store-manager-products/${encodeURIComponent(id)}/availability`, { method:'PATCH', body:JSON.stringify({available}) });
+export const deleteStoreManagerProduct = async (id) => request(`/api/v1/store-manager-products/${encodeURIComponent(id)}`, { method:'DELETE' });
 export const searchProducts = async (params = {}) => getProducts(params);
-export const getProduct = async (productId) => request(`/api/v1/products/${encodeURIComponent(productId)}`);
+export const getProduct = async (productId, options = {}) => request(`/api/v1/products/${encodeURIComponent(productId)}`, options);
 export const createProduct = async (data) => request('/api/v1/products', { method:'POST', body:JSON.stringify(data) });
 export const updateProduct = async (id, data) => request(`/api/v1/products/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(data) });
 export const deleteProduct = async (id) => request(`/api/v1/products/${encodeURIComponent(id)}`, { method:'DELETE' });
-export const getStores = async (params = {}) => request(`/api/v1/stores${buildQueryString(params)}`);
-export const getStore = async (storeId) => request(`/api/v1/stores/${encodeURIComponent(storeId)}`);
+export const getStores = async (params = {}, options = {}) => request(`/api/v1/stores${buildQueryString(params)}`, options);
+export const getStore = async (storeId, options = {}) => request(`/api/v1/stores/${encodeURIComponent(storeId)}`, options);
 export const createStore = async (data) => request('/api/v1/stores', { method:'POST', body:JSON.stringify(data) });
 export const updateStore = async (id, data) => request(`/api/v1/stores/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(data) });
 export const deleteStore = async (id) => request(`/api/v1/stores/${encodeURIComponent(id)}`, { method:'DELETE' });
-export const getStoreDeliveryZones = async (storeId) => request(`/api/v1/stores/${encodeURIComponent(storeId)}/delivery-zones`);
+export const getLocations = async (params = {}, options = {}) => request(`/api/v1/locations${buildQueryString(params)}`, options);
+export const createLocation = async (data) => request('/api/v1/locations', { method:'POST', body:JSON.stringify(data) });
+export const updateLocation = async (id, data) => request(`/api/v1/locations/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(data) });
+export const deleteLocation = async (id) => request(`/api/v1/locations/${encodeURIComponent(id)}`, { method:'DELETE' });
+export const getStoreDeliveryZones = async (storeId, options = {}) => request(`/api/v1/stores/${encodeURIComponent(storeId)}/delivery-zones`, options);
 export const createStoreDeliveryZone = async (storeId, data) => request(`/api/v1/stores/${encodeURIComponent(storeId)}/delivery-zones`, { method:'POST', body:JSON.stringify(data) });
 export const updateStoreDeliveryZone = async (storeId, zoneId, data) => request(`/api/v1/stores/${encodeURIComponent(storeId)}/delivery-zones/${encodeURIComponent(zoneId)}`, { method:'PUT', body:JSON.stringify(data) });
 export const deleteStoreDeliveryZone = async (storeId, zoneId) => request(`/api/v1/stores/${encodeURIComponent(storeId)}/delivery-zones/${encodeURIComponent(zoneId)}`, { method:'DELETE' });
@@ -86,13 +101,13 @@ export const getCachedStoreDeliveryQuote = async (storeId, params = {}) => {
   return entry.promise;
 };
 export const clearDeliveryQuoteCache = () => quoteCache.clear();
-export const getProductVariants = async (productId) => request(`/api/v1/products/${encodeURIComponent(productId)}/variants`);
-export const getVariant = async (variantId) => request(`/api/v1/variants/${encodeURIComponent(variantId)}`);
+export const getProductVariants = async (productId, options = {}) => request(`/api/v1/products/${encodeURIComponent(productId)}/variants`, options);
+export const getVariant = async (variantId, options = {}) => request(`/api/v1/variants/${encodeURIComponent(variantId)}`, options);
 export const createVariant = async (productId, data) => request(`/api/v1/products/${encodeURIComponent(productId)}/variants`, { method:'POST', body:JSON.stringify(data) });
 export const updateVariant = async (id, data) => request(`/api/v1/variants/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(data) });
 export const deleteVariant = async (id) => request(`/api/v1/variants/${encodeURIComponent(id)}`, { method:'DELETE' });
-export const getProductImages = async (productId) => request(`/api/v1/products/${encodeURIComponent(productId)}/images`);
-export const getImage = async (imageId) => request(`/api/v1/images/${encodeURIComponent(imageId)}`);
+export const getProductImages = async (productId, options = {}) => request(`/api/v1/products/${encodeURIComponent(productId)}/images`, options);
+export const getImage = async (imageId, options = {}) => request(`/api/v1/images/${encodeURIComponent(imageId)}`, options);
 export const createImage = async (productId, data) => request(`/api/v1/products/${encodeURIComponent(productId)}/images`, { method:'POST', body:JSON.stringify(data) });
 export const updateImage = async (id, data) => request(`/api/v1/images/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(data) });
 export const deleteImage = async (id) => request(`/api/v1/images/${encodeURIComponent(id)}`, { method:'DELETE' });
@@ -102,7 +117,15 @@ export const getStoreProducts = async (storeId, params = {}) => {
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
   });
-  return request(`/api/v1/store-products${query.toString() ? `?${query.toString()}` : ''}`);
+  return request(`/api/v1/store-products${query.toString() ? `?${query.toString()}` : ''}`, { auth: true });
+};
+export const getPublicStoreProducts = async (storeId, params = {}) => {
+  const query = new URLSearchParams();
+  if (storeId) query.set('storeId', String(storeId));
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  });
+  return request('/api/v1/public/store-products' + (query.toString() ? '?' + query.toString() : ''), { auth: false });
 };
 export const createStoreProduct = async (data) => request('/api/v1/store-products', { method:'POST', body:JSON.stringify(data) });
 export const updateStoreProduct = async (id, data) => request(`/api/v1/store-products/${encodeURIComponent(id)}`, { method:'PUT', body:JSON.stringify(data) });

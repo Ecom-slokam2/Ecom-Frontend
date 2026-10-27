@@ -1,6 +1,7 @@
 import { customerAuthService } from './customerAuthService.js';
 import { customerProfileService } from './customerProfileService.js';
 import { orgAccessService } from './orgAccessService.js';
+import { updateStaffProfile } from './staffProfileUpdate.js';
 
 const databaseRequired = (kind) => {
   throw new Error(`${kind} is not saved because a MySQL-backed API is not configured for this action.`);
@@ -30,11 +31,13 @@ export const orderStore = {
 };
 
 export const staffProfileStore = {
-  async update(profile = {}, authenticatedUser = null) {
-    if (!authenticatedUser?.id) throw new Error('No staff user is signed in.');
-    if (profile.newPassword) await orgAccessService.changePassword({ currentPassword: profile.currentPassword, newPassword: profile.newPassword });
-    const saved = profile.name ? await orgAccessService.updateMyName(profile.name) : authenticatedUser;
-    return { ...authenticatedUser, ...saved, name: saved?.name || profile.name || authenticatedUser.name };
+  update(profile = {}, authenticatedUser = null) {
+    return updateStaffProfile({
+      profile,
+      authenticatedUser,
+      changePassword: (request) => orgAccessService.changePassword(request),
+      updateMyName: (name) => orgAccessService.updateMyName(name),
+    });
   },
 };
 

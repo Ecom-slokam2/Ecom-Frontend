@@ -43,7 +43,7 @@ const fixture = (items = []) => {
   };
   const mutate = (storeId, operation = 'add', delta = 0) => mutateAuthenticatedCart({ customerId: 'owner', storeId,
     item: { ...guest(storeId), quantity: 1 }, operation, delta, api, storage,
-    checkInventory: stores => validateCheckoutAvailability(stores, async query => ({ ...query, availableQuantity: stock, status: 'ACTIVE' })),
+    checkInventory: stores => validateCheckoutAvailability(stores, async query => ({ ...query, available: stock > 0 })),
   });
   return { carts, calls, data, storage, api, mutate, stock: value => { stock = value; },
     lose: () => { loseResponse = true; }, fail: store => { failStore = store; } };
@@ -62,17 +62,18 @@ test('login transfer A then update/remove guest B always uses B server item ID',
   assert.deepEqual(f.calls.filter(call => call.itemId).map(call => call.itemId), ['server-product-b', 'server-product-b']);
 });
 
-for (const stock of [3, 2]) test(`lost transfer response reconciles original key before add with stock ${stock}`, async () => {
+test('lost guest transfer response replays idempotently then applies the requested add once', async () => {
+  const stock = 1;
   const f = fixture([guest('a')]); f.stock(stock); f.lose();
   await assert.rejects(f.mutate('a'), /lost response/);
   const saved = JSON.parse(f.storage.getItem('guest-transfer:owner:a:product-a:'));
   assert.equal(saved.targetQuantity, 2);
   assert.equal(f.carts.get('a').items[0].quantity, 2);
-  if (stock === 3) await f.mutate('a');
-  else await assert.rejects(f.mutate('a'), /insufficient stock/);
+  await f.mutate('a');
   assert.equal(f.calls[0].key, f.calls[1].key);
-  assert.equal(f.carts.get('a').items[0].quantity, stock);
-  assert.equal(f.calls.length, stock === 3 ? 3 : 2);
+  assert.notEqual(f.calls[1].key, f.calls[2].key);
+  assert.equal(f.carts.get('a').items[0].quantity, 3);
+  assert.equal(f.calls.length, 3);
   assert.deepEqual(JSON.parse(f.storage.getItem('guestCartItems')), []);
 });
 

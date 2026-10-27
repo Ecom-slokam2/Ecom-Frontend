@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildReportExport, calculateStorePerformance, downloadJsonReport, filterReportOrders, loadReportOrders, summarizeOrders } from './adminReportData.js';
+import { buildReportExport, calculateStorePerformance, downloadJsonReport, filterReportOrders, loadReportOrders, loadStoreManagerReportOrders, reportProductCount, reportStockUnits, summarizeOrders } from './adminReportData.js';
 
 test('reports load backend orders that are absent from browser-local order storage', async () => {
   const backendOrder = { id: 'backend-only-order', status: 'DELIVERED', total: 75 };
@@ -13,6 +13,15 @@ test('reports load backend orders that are absent from browser-local order stora
 
 test('reports reject invalid backend order responses instead of treating them as an empty collection', async () => {
   await assert.rejects(loadReportOrders(async () => ({ content: [] })), /invalid report collection/);
+});
+
+test('Store Manager report requests always include the assigned store and reject a missing assignment', async () => {
+  let request;
+  const rows = [{ id: 'store-order', status: 'CREATED', totalAmount: 12 }];
+  const result = await loadStoreManagerReportOrders(async (params) => { request = params; return rows; }, 'store-assigned');
+  assert.deepEqual(request, { storeId: 'store-assigned' });
+  assert.deepEqual(result, rows);
+  assert.throws(() => loadStoreManagerReportOrders(async () => [], ''), /verified store assignment/);
 });
 
 test('backend order loading counts an order ID once after adaptation', async () => {
@@ -56,6 +65,7 @@ test('report filters apply the selected date range, location, and store', () => 
     { id: '2', createdAt: '2026-10-21T10:00:00Z', sourceLocation: 'Pune', sourceStore: 'Other' },
   ];
   assert.deepEqual(filterReportOrders(orders, { from: '2026-10-20', to: '2026-10-20', location: 'Hyderabad', store: 'Main' }), [orders[0]]);
+  assert.deepEqual(filterReportOrders(orders, { from: '', to: '', location: 'hyderabad', store: 'main' }), [orders[0]]);
 });
 
 test('store performance reflects filtered orders and chosen sort', () => {
@@ -65,6 +75,27 @@ test('store performance reflects filtered orders and chosen sort', () => {
     { name: 'A', location: 'Hyderabad', orders: 1, revenue: 12 },
     { name: 'B', location: 'Hyderabad', orders: 1, revenue: 0 },
   ]);
+});
+
+test('Location Admin report product and inventory KPIs follow the selected assigned store', () => {
+  const products = [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }];
+  const mappings = [
+    { storeId: 'hyd-1', productId: 'p1', available: true },
+    { storeId: 'hyd-1', productId: 'p2', available: false },
+    { storeId: 'hyd-2', productId: 'p2', available: true },
+    { storeId: 'hyd-2', productId: 'p3', available: true },
+  ];
+  const inventory = [
+    { storeId: 'hyd-1', availableQuantity: 5 },
+    { storeId: 'hyd-2', availableQuantity: 11 },
+    { storeId: 'chn-1', availableQuantity: 99 },
+  ];
+  assert.equal(reportProductCount(products, mappings, 'hyd-1', true), 1);
+  assert.equal(reportStockUnits(inventory, 'hyd-1', true), 5);
+  assert.equal(reportProductCount(products, mappings, null, true), 3);
+  assert.equal(reportStockUnits(inventory, null, true), 115);
+  assert.equal(reportProductCount(products, mappings, 'hyd-1', false), 3);
+  assert.equal(reportStockUnits(inventory, 'hyd-1', false), 115);
 });
 
 test('JSON export contains selected filters and excludes private customer and payment details', () => {

@@ -13,12 +13,10 @@ import { readLanguage } from './i18n/preferences';
 
 document.documentElement.lang = languageCode(readLanguage());
 
-// Business records and persistent preferences belong in backend services and
-// MySQL. Clear browser-local state left by older builds on this app origin.
-localStorage.clear();
-for (const key of Object.keys(sessionStorage)) {
-  if (key !== 'authToken') sessionStorage.removeItem(key);
-}
+// Keep scoped browser state intact. Checkout retries and idempotency keys live
+// in sessionStorage, while location and guest-cart transfer state use
+// localStorage. Clearing either storage on every page load can duplicate work
+// or discard a customer's in-progress checkout.
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

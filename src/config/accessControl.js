@@ -16,8 +16,8 @@ export const ROLE_HIERARCHY = {
 
 export const ROLE_MODULES = {
   'super-admin': ['dashboard','locations','users','stores','categories','products','banners','inventory','orders','payments','delivery','notifications','customers','reviews','coupons','reports','security','audit-logs'],
-  'global-admin': ['dashboard','stores','products','banners','inventory','orders','payments','customers','reviews','coupons','notifications','reports','audit-logs'],
-  'location-admin': ['dashboard','stores','products','banners','inventory','orders','payments','delivery','coupons','reports'],
+  'global-admin': ['dashboard','products','banners','inventory','orders','payments','customers','reviews','coupons','notifications','reports','audit-logs'],
+  'location-admin': ['dashboard','users','stores','products','banners','inventory','orders','payments','delivery','coupons','reports'],
   'store-manager': ['dashboard','stores','products','banners','inventory','orders','delivery','coupons','reports'],
 };
 
@@ -38,7 +38,15 @@ export const scopeRecords = (records, user, stores = [], products = []) => {
   return records.filter((record) => {
     const itemIds = (record.items || []).map((item) => item.id);
     if (itemIds.length && record.fulfillmentType==='global' && record.globalApproval!=='Approved') return false;
-    if (itemIds.length && user.role==='location-admin') return record.sourceLocation===user.location || record.location===user.location || record.fulfilmentAssignments?.some((assignment)=>assignment.location===user.location) || record.items.some((item)=>item.sourceLocation===user.location);
+    if (itemIds.length && user.role==='location-admin') {
+      const storeRefs=[
+      record.storeId, record.sourceStoreId, record.assignedStoreId, record.store, record.sourceStore,
+      ...(record.fulfilmentAssignments || []).flatMap((assignment)=>[assignment.storeId, assignment.store]),
+      ...record.items.flatMap((item)=>[item.storeId, item.sourceStoreId, item.store, item.sourceStore]),
+      ].filter(Boolean);
+      if(storeRefs.length) return permittedStores.some((store)=>storeRefs.some((value)=>sameText(value,store)));
+      return [record.sourceLocation,record.location,...(record.fulfilmentAssignments||[]).map((assignment)=>assignment.location),...record.items.map((item)=>item.sourceLocation)].some((value)=>sameText(value,user.location));
+    }
     if (itemIds.length && user.role==='store-manager') return sameText(record.sourceStoreId,user.storeId) || sameText(record.storeId,user.storeId) || sameText(record.sourceStore,user.store) || sameText(record.store,user.store) || record.fulfilmentAssignments?.some((assignment)=>sameText(assignment.storeId,user.storeId) || sameText(assignment.store,user.store)) || record.items.some((item)=>sameText(item.storeId,user.storeId) || sameText(item.sourceStore,user.store) || sameText(item.store,user.store));
     if (user.store && sameText(record.name,user.store)) return true;
     if (record.role && record.location) return sameText(record.location, user.location) && (!user.store || sameText(record.store,user.store));

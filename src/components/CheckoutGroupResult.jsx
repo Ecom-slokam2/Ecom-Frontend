@@ -43,7 +43,7 @@ export default function CheckoutGroupResult({ group, error, onRetry, onNewChecko
     </Box>)}
     </Box>
     {!view.complete && !view.failed && <Button onClick={onRetry}>Check Checkout Status</Button>}
-    {view.complete && onCart && <Button variant="outlined" onClick={onCart}>Back to Cart</Button>}
+    {view.complete && onCart && <Button variant="outlined" onClick={onCart}>Start another order</Button>}
     {view.canStartNew && onNewCheckout && <Button variant="outlined" onClick={onNewCheckout}>Review Cart &amp; Retry</Button>}
   </Box>;
 }

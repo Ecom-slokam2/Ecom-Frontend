@@ -14,7 +14,7 @@ import { AppContext } from '../../context/AppContext';
 import { buildOrderAddressesPayload, buildOrderItemsPayload, createOrder, getOrder, normalizeOrder, retrySavedOrder } from '../../services/orderApi';
 import { createPayment, getPayment, getPaymentByOrder, getPaymentStatus, normalizePayment } from '../../services/paymentApi';
 import { getProduct } from '../../services/catalogApi';
-import { checkoutErrorMessage, validateGlobalCheckout } from '../../utils/globalCheckout';
+import { checkoutErrorMessage, validateCartProducts, validateGlobalCheckout } from '../../utils/globalCheckout';
 import './PaymentOptions.css';
 import { getPaymentCapabilities } from '../../services/paymentApi';
 import { requirePaymentProcessing } from '../../utils/paymentAvailability';
@@ -22,7 +22,7 @@ import * as cartApi from '../../services/cartApi';
 import { prepareCheckoutCart, finishCheckoutCart } from '../../utils/checkoutCart';
 import { createCheckoutGroup, getCheckoutGroupByKey, getCheckoutGroupByCart } from '../../services/orderApi';
 import { persistStoreCheckout } from '../../utils/persistedStoreCheckout';
-import { findInventoryForItem } from '../../services/inventoryApi';
+import { getPublicInventoryAvailability } from '../../services/inventoryApi';
 import { validateCheckoutAvailability } from '../../utils/checkoutAvailability';
 
 const methods = [
@@ -41,6 +41,7 @@ const paymentStatusText = {
 const GLOBAL_STORE_ID = 'global-store';
 const GLOBAL_STORE_NAME = 'India-wide Global Store';
 const COMPLETED_CHECKOUT_RETURN_KEY = 'freshcart.completedCheckoutReturnToCart';
+const promotionLocationFor = (checkout = {}) => String(checkout.customerLocation || '').trim().slice(0, 150);
 const isPaidOrderStatus = (status) => ['PAID', 'SUCCESS'].includes(String(status || '').toUpperCase());
 const tokenCustomerId = () => {
   try {
@@ -85,7 +86,7 @@ const resolveCheckoutStoreId = ({ activeCart, checkout = {}, cartItems = [] } = 
 const PaymentOptions = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { activeCart, addresses, cartItems, clearCart, formatCurrency, user, catalogStores } = useContext(AppContext);
+  const { activeCart, addresses, cartItems, clearCartAfterCheckout, formatCurrency, user, catalogStores } = useContext(AppContext);
   const customerId = tokenCustomerId() || user?.id || '';
   const checkout = useMemo(() => location.state?.checkout || {}, [location.state]);
   const existingOrderId = location.state?.orderId || location.state?.order?.id || '';
@@ -187,6 +188,11 @@ const PaymentOptions = () => {
       if (!storeId) throw new Error('Select the store for the saved checkout before retrying.');
       return normalizeOrder(await retrySavedOrder(customerId, storeId));
     }
+    await validateCartProducts(cartItems, getProduct);
+    const unpricedItem = cartItems.find((item) => !Number.isFinite(Number(item.unitPrice ?? item.price)) || Number(item.unitPrice ?? item.price) <= 0);
+    if (unpricedItem) {
+      throw new Error(`${unpricedItem.productName || unpricedItem.title || 'A cart item'} has no valid price. Refresh the catalog or remove and add the item again before placing the order.`);
+    }
     await verifyGlobalItems();
     const deliveryLines = checkout.deliveryLines || [];
     const splitKeys = splitKeysFor(cartItems, deliveryLines);
@@ -237,7 +243,7 @@ const PaymentOptions = () => {
             scheduledDeliverySlot: line.scheduleSlot || null,
             pickupDetails: line.pickupDetails || null,
             couponCode: checkout.coupon || '',
-            promotionLocation: checkout.customerLocation || '',
+            promotionLocation: promotionLocationFor(checkout),
             paymentStatus: 'PENDING',
           }));
           return {
@@ -295,7 +301,7 @@ const PaymentOptions = () => {
         scheduledDeliverySlot: primaryLine.scheduleSlot || checkout.slot || null,
         pickupDetails: primaryLine.pickupDetails || (checkout.pickupStore ? `Pickup from ${checkout.pickupStore}` : null),
         couponCode: checkout.coupon || '',
-        promotionLocation: checkout.customerLocation || '',
+        promotionLocation: promotionLocationFor(checkout),
         paymentStatus: 'PENDING',
       }));
   };
@@ -316,14 +322,17 @@ const PaymentOptions = () => {
   };
 
   const lookupCheckoutInventory = async (query) => {
-    return findInventoryForItem(query);
+    return getPublicInventoryAvailability(query);
   };
 
   const pay = async (retrySaved = false) => {
     if (status === 'submitting' || submissionBusy.current) return;
     if (checkoutBlock) return;
     const selectedPaymentMethod = selectableMethods.find((item) => item.id === method)?.paymentMethod || 'DEMO_COD';
-    if (!existingOrderId && selectedPaymentMethod === 'DEMO_COD') {
+    // Multi-store carts must use the atomic persisted checkout workflow below
+    // for COD too. Creating per-store orders here can leave a partial checkout
+    // when a later store rejects its order.
+    if (!(persistedMultiStore && multiStoreCart) && !existingOrderId && selectedPaymentMethod === 'DEMO_COD') {
       const validation = validate(retrySaved);
       if (validation) { setError(validation); setStatus('failed'); return; }
       submissionBusy.current = true;
@@ -344,7 +353,7 @@ const PaymentOptions = () => {
         }
         if (!existingOrderId) {
           finishCheckoutCart(customerId, order.storeId);
-          if (!retrySaved) await clearCart();
+          if (!retrySaved) clearCartAfterCheckout();
         }
         setResult({ order, payment: pendingPayment || { status: 'PENDING', amount: payableAmount, paymentMethod: selectedPaymentMethod, paymentId: '' } });
         sessionStorage.setItem(COMPLETED_CHECKOUT_RETURN_KEY, order.id);
@@ -389,10 +398,10 @@ const PaymentOptions = () => {
           deliveryCharge: group.line.deliveryType === 'pickup' || checkout.method === 'pickup' ? 0 : Number(group.line.deliveryCharge ?? (groups.length === 1 ? checkout.deliveryFee : 0) ?? 0),
           customerLatitude: checkout.customerLatitude ?? null,
           customerLongitude: checkout.customerLongitude ?? null,
-          scheduledDeliveryDate: checkout.date || null,
-          scheduledDeliverySlot: checkout.slot || null,
+          scheduledDeliveryDate: group.line.scheduleDate || checkout.date || null,
+          scheduledDeliverySlot: group.line.scheduleSlot || checkout.slot || null,
           couponCode:index===0?(checkout.coupon||''):'',
-          promotionLocation:checkout.customerLocation||'',
+          promotionLocation:promotionLocationFor(checkout),
         }));
         const group = await persistStoreCheckout({ customerId, stores, cartApi, request: createCheckoutGroup, lookup: getCheckoutGroupByKey, lookupCart: getCheckoutGroupByCart, checkInventory: entries => validateCheckoutAvailability(entries, lookupCheckoutInventory) });
         navigate(`/checkout-group/${encodeURIComponent(group.id)}`);
@@ -422,7 +431,7 @@ const PaymentOptions = () => {
       if (isCashOnDelivery) {
         if (!existingOrderId) {
           finishCheckoutCart(customerId, order.storeId);
-          if (!retrySaved) await clearCart();
+          if (!retrySaved) clearCartAfterCheckout();
         }
         setResult({ order, payment: { status: 'PENDING', amount: payableAmount, paymentMethod, paymentId: '' } });
         sessionStorage.setItem(COMPLETED_CHECKOUT_RETURN_KEY, order.id);
@@ -481,7 +490,7 @@ const PaymentOptions = () => {
 
   if (status !== 'succeeded' && sessionStorage.getItem(COMPLETED_CHECKOUT_RETURN_KEY)) return <Box className="payment-shell" role="status">Returning to your cart…</Box>;
 
-  if (status === 'succeeded' && result) return <Box className="payment-shell"><Box className="payment-result"><Box className="success-ring"><CheckCircleOutlinedIcon/></Box><Typography variant="h4">{result.payment.status === 'PENDING' ? 'Order Placed' : 'Payment Successful'}</Typography><Typography color="text.secondary">{result.payment.status === 'PENDING' ? 'Cash on delivery will be collected when the order arrives.' : 'Payment Service confirmed this payment.'}</Typography><Box className="result-amount"><span>Amount</span><strong>{formatCurrency(result.payment.amount)}</strong></Box><Box className="result-refs"><span>Order ID<strong>{result.order.id}</strong></span><span>Payment ID<strong>{result.payment.paymentId || 'Pending'}</strong></span></Box>{result.order.childOrders?.length>0&&<Box className="summary-content">{result.order.childOrders.map((order)=><Box className="summary-product store-tracking-row" key={order.id}><span>{storeNameFor(order)}<small>{order.id} | {order.deliveryLabel || order.estimatedDelivery || 'Tracking available'}</small></span><strong>{formatCurrency(order.totalAmount || order.total)}</strong><Button size="small" variant="outlined" onClick={()=>navigate(`/order-details/${encodeURIComponent(order.id)}`,{state:{orderId:order.id,paymentId:result.payment.paymentId}})}>Track</Button></Box>)}</Box>}<Box className="result-refs"><span>Payment Status<strong>{result.payment.status}</strong></span><span>Method<strong>{displayPaymentMethod(result.payment.paymentMethod)}</strong></span></Box><Box className="result-actions"><Button variant="contained" onClick={()=>result.order.childOrders?.length?navigate('/orders'):navigate(`/order-details/${encodeURIComponent(result.order.id)}`,{state:{orderId:result.order.id,paymentId:result.payment.paymentId}})}>{result.order.childOrders?.length?'View All Orders':'View Order Details & Tracking'}</Button><Button variant="outlined" onClick={()=>navigate('/home')}>Continue Shopping</Button><Button variant="outlined" onClick={()=>navigate('/cart',{replace:true})}>Back to Cart</Button></Box></Box></Box>;
+  if (status === 'succeeded' && result) return <Box className="payment-shell"><Box className="payment-result"><Box className="success-ring"><CheckCircleOutlinedIcon/></Box><Typography variant="h4">{result.payment.status === 'PENDING' ? 'Order Placed' : 'Payment Successful'}</Typography><Typography color="text.secondary">{result.payment.status === 'PENDING' ? 'Cash on delivery will be collected when the order arrives.' : 'Payment Service confirmed this payment.'}</Typography><Box className="result-amount"><span>Amount</span><strong>{formatCurrency(result.payment.amount)}</strong></Box><Box className="result-refs"><span>Order ID<strong>{result.order.id}</strong></span><span>Payment ID<strong>{result.payment.paymentId || 'Pending'}</strong></span></Box>{result.order.childOrders?.length>0&&<Box className="summary-content">{result.order.childOrders.map((order)=><Box className="summary-product store-tracking-row" key={order.id}><span>{storeNameFor(order)}<small>{order.id} | {order.deliveryLabel || order.estimatedDelivery || 'Tracking available'}</small></span><strong>{formatCurrency(order.totalAmount || order.total)}</strong><Button size="small" variant="outlined" onClick={()=>navigate(`/order-details/${encodeURIComponent(order.id)}`,{state:{orderId:order.id,paymentId:result.payment.paymentId}})}>Track</Button></Box>)}</Box>}<Box className="result-refs"><span>Payment Status<strong>{result.payment.status}</strong></span><span>Method<strong>{displayPaymentMethod(result.payment.paymentMethod)}</strong></span></Box><Box className="result-actions"><Button variant="contained" onClick={()=>result.order.childOrders?.length?navigate('/orders'):navigate(`/order-details/${encodeURIComponent(result.order.id)}`,{state:{orderId:result.order.id,paymentId:result.payment.paymentId}})}>{result.order.childOrders?.length?'View All Orders':'View Order Details & Tracking'}</Button><Button variant="outlined" onClick={()=>navigate('/home',{replace:true})}>Continue Shopping</Button></Box></Box></Box>;
 
   return <Box className="payment-shell">
     <header className="payment-header"><Button startIcon={<ArrowBackIcon/>} onClick={()=>navigate(-1)}>Secure Checkout</Button><Box><LockOutlinedIcon/><span>Secure Payment</span></Box></header>

@@ -9,14 +9,21 @@ export const parseVariantAttributes = (attributes) => {
   }
 };
 
+export const normalizeWeightLabel = (value) => String(value || '').trim()
+  .replace(/\b(kilograms?|kgs?)\b/ig, 'kg')
+  .replace(/\b(grams?|grms?)\b/ig, 'g')
+  .replace(/(\d+(?:\.\d+)?)\s*(kg|g)\b/ig, (_, amount, unit) => `${amount} ${unit.toLowerCase()}`)
+  .replace(/\s+/g, ' ');
+
 export const variantChoiceLabel = (variant) => {
   const attributes = parseVariantAttributes(variant?.attributes);
   const values = Object.entries(attributes)
     .filter(([key, value]) => /^(size|weight|color|colour|pack|type|flavou?r|capacity|material)$/i.test(key) && value !== null && value !== undefined && String(value).trim())
-    .map(([key, value]) => `${key[0].toUpperCase()}${key.slice(1)}: ${String(value).trim()}`);
+    .map(([key, value]) => `${key[0].toUpperCase()}${key.slice(1)}: ${/^weight$/i.test(key) ? normalizeWeightLabel(value) : String(value).trim()}`);
   if (values.length) return values.join(' · ');
   const name = String(variant?.name || variant?.label || variant?.size || variant?.weight || '').trim();
-  return /^(default|variant|option)$/i.test(name) ? '' : name;
+  if (/^(default|variant|option)$/i.test(name)) return '';
+  return normalizeWeightLabel(name);
 };
 
 export const normalizeProductImageUrl = (value) => {

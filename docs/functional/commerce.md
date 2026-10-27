@@ -28,7 +28,7 @@ Backend order total = verified item totals + delivery charge + handling fee, rou
 
 Catalog verification supplies product/variant pricing; duplicate item identity is rejected. New orders cannot claim a completed payment state.
 
-Coupon entry and admin coupon configuration exist, but `SERVER_COUPONS_ENABLED` is false and lookup returns no coupon. Validation reports unavailable until server promotions are enabled. Checkout policy rejects nonzero discounts. UI suggestions such as `SAVE10` do not make coupons redeemable.
+Coupon entry and admin coupon configuration exist. Store Managers may configure coupons scoped only to their assigned store; the Catalog API derives that store from authenticated identity and enforces the same boundary on reads and writes. Coupon redemption remains disabled by the Catalog Service setting `app.promotions.redemption-enabled` (default `false`); validation returns no discount while it is off. Checkout policy also rejects unverified discounts. UI suggestions such as `SAVE10` do not make coupons redeemable.
 
 Dormant coupon calculation supports fixed/percentage discounts, maximum discount and subtotal cap. Other dormant checks cover active status, dates, scope, minimum order and product/category targets. They are not an active promotion engine.
 

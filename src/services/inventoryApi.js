@@ -74,6 +74,10 @@ export const getAllInventories = async (params = {}) => {
   return uniqueRows;
 };
 export const getInventoryForItem = ({ storeId, productId, variantId }) => request(`/api/v1/inventories${buildQueryString({ storeId, productId, variantId })}`);
+export const getPublicInventoryAvailability = ({ storeId, productId, variantId }) => request(
+  `/api/v1/public/inventory-availability${buildQueryString({ storeId, productId, variantId })}`,
+  { auth: false, expireSession: false },
+);
 const inventoryRows = (payload) => Array.isArray(payload)
   ? payload
   : payload?.content || payload?.items || payload?.data || payload?.inventories || (payload ? [payload] : []);

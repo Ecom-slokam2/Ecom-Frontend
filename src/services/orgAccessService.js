@@ -18,7 +18,7 @@ const normalizeRole = (role) => {
   return map[normalized] || normalized;
 };
 
-export const teamLandingPath = (role) => role === 'delivery-partner' ? '/delivery' : role === 'store-manager' ? '/store-manager/dashboard' : '/admin';
+export const teamLandingPath = (role) => role === 'delivery-partner' ? '/delivery' : role === 'store-manager' ? '/store-manager/dashboard' : ['super-admin', 'global-admin', 'location-admin'].includes(role) ? '/admin/dashboard' : '/unauthorized';
 
 export const orgAccessService = {
   async login(username, password) {
@@ -66,30 +66,33 @@ export const orgAccessService = {
   async validate() { return apiRequest(ORG_ACCESS_BASE_URL, '/api/auth/validate'); },
   async listUsers() { return apiRequest(ORG_ACCESS_BASE_URL, '/api/users'); },
   async createUser(user) {
+    const role = String(user.role || '').toUpperCase().replace(/-/g, '_');
+    const isStoreAccount = role === 'STORE_MANAGER' || role === 'DELIVERY_PARTNER';
+    const isLocationAdmin = role === 'LOCATION_ADMIN';
     return apiRequest(ORG_ACCESS_BASE_URL, '/api/users', {
       method: 'POST',
       body: JSON.stringify({
         username:user.username || user.email,
         email:user.email,
         password:user.password,
-        role:String(user.role || '').toUpperCase().replace(/-/g, '_'),
+        role,
         name:user.name || null,
         mobile:user.mobile || user.phone || null,
         status:user.status || 'Active',
         organizationId:user.organizationId || 'metaarch-commerce',
         // Org Access persists location_id as the canonical lower-case key used by existing memberships.
-        location:user.location ? String(user.location).trim().toLowerCase() : null,
-        storeId:user.storeId || null,
-        store:user.store || user.storeName || null,
-        storeLocation:user.storeLocation || user.location || null,
-        storeAddress:user.storeAddress || user.address || null,
-        latitude:user.latitude === '' || user.latitude == null ? null : Number(user.latitude),
-        longitude:user.longitude === '' || user.longitude == null ? null : Number(user.longitude),
-        provider:user.provider || null,
-        providerPlaceId:user.providerPlaceId || null,
-        providerOsmType:user.providerOsmType || null,
-        providerOsmId:user.providerOsmId || null,
-        locationAccuracyMeters:user.locationAccuracyMeters === '' || user.locationAccuracyMeters == null ? null : Number(user.locationAccuracyMeters),
+        location:isLocationAdmin && user.location ? String(user.location).trim().toLowerCase() : null,
+        storeId:isStoreAccount ? user.storeId || null : null,
+        store:isStoreAccount ? user.store || user.storeName || null : null,
+        storeLocation:isStoreAccount ? user.storeLocation || user.location || null : null,
+        storeAddress:isStoreAccount ? user.storeAddress || user.address || null : null,
+        latitude:isStoreAccount && user.latitude !== '' && user.latitude != null ? Number(user.latitude) : null,
+        longitude:isStoreAccount && user.longitude !== '' && user.longitude != null ? Number(user.longitude) : null,
+        provider:isStoreAccount ? user.provider || null : null,
+        providerPlaceId:isStoreAccount ? user.providerPlaceId || null : null,
+        providerOsmType:isStoreAccount ? user.providerOsmType || null : null,
+        providerOsmId:isStoreAccount ? user.providerOsmId || null : null,
+        locationAccuracyMeters:isStoreAccount && user.locationAccuracyMeters !== '' && user.locationAccuracyMeters != null ? Number(user.locationAccuracyMeters) : null,
       }),
     });
   },
@@ -106,6 +109,17 @@ export const orgAccessService = {
         location: user.role === 'location-admin' ? String(user.location || '').trim().toLowerCase() : null,
       }),
     });
+  },
+  async resetUserPassword(id, newPassword) {
+    if (!Number.isInteger(Number(id)) || Number(id) <= 0) throw new Error('A valid staff account ID is required.');
+    return apiRequest(ORG_ACCESS_BASE_URL, `/api/users/${encodeURIComponent(id)}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ newPassword: String(newPassword || '') }),
+    });
+  },
+  async deleteUser(id) {
+    if (!Number.isInteger(Number(id)) || Number(id) <= 0) throw new Error('A valid staff account ID is required.');
+    return apiRequest(ORG_ACCESS_BASE_URL, `/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
   async changePassword({ currentPassword, newPassword }) {
     return apiRequest(ORG_ACCESS_BASE_URL, '/api/users/me/password', {
